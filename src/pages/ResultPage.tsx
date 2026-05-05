@@ -21,7 +21,7 @@ const districtLabelMap: Record<string, string> = {
 };
 
 const itemLabelMap: Record<string, string> = {
-  CLEAR_PET_BOTTLE: "투명 페트병",
+  PET_BOTTLE: "페트병",
   CAN: "캔",
   GLASS_BOTTLE: "유리병",
   PLASTIC_CONTAINER: "플라스틱 용기",
@@ -34,6 +34,15 @@ const ResultPage = ({
   onDetail,
   onFeedback,
 }: Props) => {
+  const stateText =
+    data.itemCode === "PET_BOTTLE"
+      ? `${data.isTransparent ? "무색 투명" : "유색/불투명"} / ${
+          data.hasLabel ? "라벨 있음" : "라벨 없음"
+        } / ${data.isEmpty ? "내용물 없음" : "내용물 남음"}`
+      : `${data.isEmpty ? "내용물 없음" : "내용물 남음"}${
+          data.isBroken ? " / 깨짐" : ""
+        }${data.isContaminated ? " / 오염 있음" : ""}`;
+
   return (
     <main className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-sky-50 px-6 py-10">
       <div className="mx-auto max-w-4xl rounded-4xl bg-white/95 p-8 shadow-xl ring-1 ring-gray-100 md:p-10">
@@ -52,21 +61,18 @@ const ResultPage = ({
 
         <section className="mb-8">
           <p className="mb-3 text-sm font-bold text-emerald-600">
-            AI 추정 결과
+            규칙 매칭 결과
           </p>
 
           <div className="grid gap-4 rounded-3xl bg-gray-50 p-6 text-gray-700 md:grid-cols-3">
             <div>
               <p className="text-sm text-gray-400">품목</p>
-              <p className="font-bold">{itemLabelMap[data.item]}</p>
+              <p className="font-bold">{itemLabelMap[data.itemCode]}</p>
             </div>
 
             <div>
               <p className="text-sm text-gray-400">상태</p>
-              <p className="font-bold">
-                {data.hasLabel ? "라벨 있음" : "라벨 없음"} /{" "}
-                {data.hasLeftover ? "내용물 남음" : "내용물 없음"}
-              </p>
+              <p className="font-bold">{stateText}</p>
             </div>
 
             <div>
@@ -79,19 +85,22 @@ const ResultPage = ({
         </section>
 
         <section className="rounded-4xl border border-emerald-100 bg-emerald-50 p-8">
-          <p className="mb-3 text-sm font-bold text-emerald-700">
-            최종 판정
-          </p>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-sm font-bold text-emerald-700">최종 판정</p>
+            <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-emerald-700">
+              {result.ruleId}
+            </span>
+          </div>
 
           <h2 className="mb-6 text-3xl font-extrabold text-gray-900">
-            {result.judgement}
+            {result.verdict}
           </h2>
 
           <div className="mb-6 rounded-3xl bg-white p-6 shadow-sm">
             <h3 className="mb-4 font-bold text-gray-900">필요한 조치</h3>
 
             <ol className="space-y-3">
-              {result.actions.map((action, index) => (
+              {result.requiredAction.map((action, index) => (
                 <li
                   key={action}
                   className="flex gap-3 font-semibold text-gray-700"
@@ -110,7 +119,7 @@ const ResultPage = ({
               <p className="mb-2 text-sm font-bold text-gray-400">
                 배출 방법
               </p>
-              <p className="font-bold text-gray-900">{result.method}</p>
+              <p className="font-bold text-gray-900">{result.disposalMethod}</p>
             </div>
 
             <div className="rounded-3xl bg-white p-6 shadow-sm">

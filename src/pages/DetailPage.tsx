@@ -40,33 +40,58 @@ const DetailPage = ({ data, result, onBack }: Props) => {
 
             <div className="rounded-3xl bg-emerald-50 p-6">
               <h2 className="mb-4 text-xl font-extrabold text-gray-900">
-                공통 규칙
+                {result.ruleId}
               </h2>
-              <ul className="space-y-3 text-gray-700">
-                <li>• 페트병은 내용물을 비우고 헹군 뒤 배출해야 합니다.</li>
-                <li>• 라벨은 제거한 뒤 배출하는 것이 권장됩니다.</li>
-                <li>• 뚜껑은 지역 안내에 따라 분리하거나 닫아서 배출할 수 있습니다.</li>
-              </ul>
+              <p className="leading-relaxed text-gray-700">{result.reason}</p>
             </div>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="mb-4 text-sm font-bold text-sky-600">지역 규칙</p>
+            <p className="mb-4 text-sm font-bold text-sky-600">
+              투명/유색 분기 기준
+            </p>
 
             <div className="rounded-3xl bg-sky-50 p-6">
-              <h2 className="mb-4 text-xl font-extrabold text-gray-900">
-                {regionLabelMap[data.region]} {districtLabelMap[data.district]} 기준
-              </h2>
               <ul className="space-y-3 text-gray-700">
-                <li>• 투명 페트병은 일반 플라스틱과 구분해 별도배출 대상으로 봅니다.</li>
-                <li>• 지역별 지정 요일이나 배출 시간은 지자체 안내를 확인해야 합니다.</li>
-                <li>• 현재 MVP에서는 지역 규칙을 단순화하여 별도배출 기준만 적용합니다.</li>
+                <li>
+                  • 무색 투명 생수·음료 페트병은 투명 페트병 별도배출
+                  대상입니다.
+                </li>
+                <li>
+                  • 유색 페트병, 불투명 페트병, 일반 PET 용기는 일반
+                  플라스틱류로 배출합니다.
+                </li>
+                <li>
+                  • 현재 입력값은{" "}
+                  <strong>
+                    {data.isTransparent
+                      ? "무색 투명 페트병"
+                      : "유색/불투명 페트병"}
+                  </strong>
+                  으로 처리되었습니다.
+                </li>
               </ul>
             </div>
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="mb-4 text-sm font-bold text-amber-600">
+              지역 규칙
+            </p>
+
+            <div className="rounded-3xl bg-amber-50 p-6">
+              <h2 className="mb-4 text-xl font-extrabold text-gray-900">
+                {regionLabelMap[data.region]} {districtLabelMap[data.district]} 기준
+              </h2>
+              <ul className="space-y-3 text-gray-700">
+                <li>• 현재 MVP에서는 지역별 규칙을 단순화하여 적용합니다.</li>
+                <li>• 실제 배출 요일과 시간은 지자체 안내를 확인해야 합니다.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+            <p className="mb-4 text-sm font-bold text-gray-600">
               시스템 판단 과정
             </p>
 
@@ -74,41 +99,38 @@ const DetailPage = ({ data, result, onBack }: Props) => {
               <div className="rounded-2xl bg-gray-50 p-5">
                 <p className="mb-1 text-sm font-bold text-gray-400">1단계</p>
                 <p className="font-semibold text-gray-800">
-                  사용자가 선택한 품목을 투명 페트병으로 확인했습니다.
+                  사용자가 입력한 품목을 페트병으로 확인했습니다.
                 </p>
               </div>
 
               <div className="rounded-2xl bg-gray-50 p-5">
                 <p className="mb-1 text-sm font-bold text-gray-400">2단계</p>
                 <p className="font-semibold text-gray-800">
-                  상태값을 확인했습니다:{" "}
-                  {data.hasLabel ? "라벨 있음" : "라벨 없음"} /{" "}
-                  {data.hasLeftover ? "내용물 남음" : "내용물 없음"} /{" "}
-                  {data.hasCap ? "뚜껑 있음" : "뚜껑 없음"}
+                  투명 여부를 확인했습니다:{" "}
+                  {data.isTransparent
+                    ? "무색 투명 페트병"
+                    : "유색/불투명 페트병"}
                 </p>
               </div>
 
               <div className="rounded-2xl bg-gray-50 p-5">
                 <p className="mb-1 text-sm font-bold text-gray-400">3단계</p>
                 <p className="font-semibold text-gray-800">
-                  지역 규칙과 공통 규칙을 함께 적용하여 “{result.judgement}”로
-                  판정했습니다.
+                  상태값을 확인했습니다:{" "}
+                  {data.hasLabel ? "라벨 있음" : "라벨 없음"} /{" "}
+                  {data.isEmpty ? "내용물 없음" : "내용물 남음"} /{" "}
+                  {data.hasCap ? "뚜껑 있음" : "뚜껑 없음"}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-gray-50 p-5">
+                <p className="mb-1 text-sm font-bold text-gray-400">4단계</p>
+                <p className="font-semibold text-gray-800">
+                  입력 조건과 가장 먼저 매칭되는 규칙인 {result.ruleId}를 적용하여
+                  “{result.verdict}”로 판정했습니다.
                 </p>
               </div>
             </div>
-          </div>
-
-          <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-6">
-            <p className="mb-2 text-sm font-bold text-emerald-700">
-              최종 설명
-            </p>
-            <p className="leading-relaxed text-gray-700">
-              {result.reason} 따라서 현재 입력값 기준으로는{" "}
-              <span className="font-extrabold text-gray-900">
-                {result.judgement}
-              </span>
-              로 안내됩니다.
-            </p>
           </div>
 
           <button

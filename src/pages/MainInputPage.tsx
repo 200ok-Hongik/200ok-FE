@@ -1,18 +1,35 @@
 import { useState } from "react";
-import type { InputData, Result } from "../types/recycle";
+import type { InputData, ItemCode, Result } from "../types/recycle";
+import { judgeWaste } from "../utils/judgePetBottle";
 
 type Props = {
+  loginEmail: string | null;
+  onLoginClick: () => void;
+  onSignupClick: () => void;
+  onLogout: () => void;
   onSubmit: (data: InputData, result: Result) => void;
 };
 
-const MainInputPage = ({ onSubmit }: Props) => {
+const MainInputPage = ({
+  loginEmail,
+  onLoginClick,
+  onSignupClick,
+  onLogout,
+  onSubmit,
+}: Props) => {
   const [image, setImage] = useState<File | null>(null);
   const [region, setRegion] = useState("");
   const [district, setDistrict] = useState("");
-  const [item, setItem] = useState("");
+  const [itemCode, setItemCode] = useState<ItemCode | "">("");
+
+  const [isTransparent, setIsTransparent] = useState<boolean | null>(null);
   const [hasLabel, setHasLabel] = useState(false);
-  const [hasLeftover, setHasLeftover] = useState(false);
+  const [isEmpty, setIsEmpty] = useState(true);
   const [hasCap, setHasCap] = useState(false);
+
+  const [isCrushed, setIsCrushed] = useState(false);
+  const [isBroken, setIsBroken] = useState(false);
+  const [isContaminated, setIsContaminated] = useState(false);
 
   const districtOptions: Record<string, { label: string; value: string }[]> = {
     SEOUL: [
@@ -25,65 +42,12 @@ const MainInputPage = ({ onSubmit }: Props) => {
     ],
   };
 
-  const itemOptions = [
-    { label: "투명 페트병", value: "CLEAR_PET_BOTTLE" },
+  const itemOptions: { label: string; value: ItemCode }[] = [
+    { label: "페트병", value: "PET_BOTTLE" },
     { label: "캔", value: "CAN" },
     { label: "유리병", value: "GLASS_BOTTLE" },
     { label: "플라스틱 용기", value: "PLASTIC_CONTAINER" },
   ];
-
-  const getResult = (): Result => {
-    if (item === "CLEAR_PET_BOTTLE") {
-      if (hasLabel && hasLeftover) {
-        return {
-          judgement: "지금 바로 배출 불가",
-          actions: [
-            "내용물을 비우기",
-            "라벨 제거하기",
-            "투명 페트병으로 별도배출하기",
-          ],
-          method: "투명 페트병 별도배출",
-          reason:
-            "투명 페트병은 내용물을 비우고 라벨을 제거한 뒤 배출해야 합니다.",
-        };
-      }
-
-      if (hasLabel) {
-        return {
-          judgement: "지금 바로 배출 불가",
-          actions: ["라벨 제거하기", "투명 페트병으로 별도배출하기"],
-          method: "투명 페트병 별도배출",
-          reason:
-            "라벨이 붙어 있는 투명 페트병은 라벨을 제거한 뒤 배출해야 합니다.",
-        };
-      }
-
-      if (hasLeftover) {
-        return {
-          judgement: "지금 바로 배출 불가",
-          actions: ["내용물을 비우고 헹구기", "투명 페트병으로 별도배출하기"],
-          method: "투명 페트병 별도배출",
-          reason:
-            "내용물이 남아 있으면 재활용 품질이 떨어질 수 있어 비운 뒤 배출해야 합니다.",
-        };
-      }
-
-      return {
-        judgement: "배출 가능",
-        actions: ["가능하면 압착하기", "투명 페트병으로 별도배출하기"],
-        method: "투명 페트병 별도배출",
-        reason:
-          "내용물이 비어 있고 라벨이 제거된 투명 페트병은 별도배출할 수 있습니다.",
-      };
-    }
-
-    return {
-      judgement: "추가 확인 필요",
-      actions: ["현재는 투명 페트병 기준으로만 판정할 수 있습니다."],
-      method: "확인 필요",
-      reason: "아직 해당 품목에 대한 규칙이 등록되지 않았습니다.",
-    };
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -91,20 +55,43 @@ const MainInputPage = ({ onSubmit }: Props) => {
     }
   };
 
-  const handleSubmit = () => {
-    const data: InputData = {
-      region,
-      district,
-      item,
-      hasLabel,
-      hasLeftover,
-      hasCap,
-    };
-
-    onSubmit(data, getResult());
+  const resetConditions = () => {
+    setIsTransparent(null);
+    setHasLabel(false);
+    setIsEmpty(true);
+    setHasCap(false);
+    setIsCrushed(false);
+    setIsBroken(false);
+    setIsContaminated(false);
   };
 
-  const isDisabled = !region || !district || !item;
+  const handleSubmit = () => {
+    if (!itemCode) return;
+    if (itemCode === "PET_BOTTLE" && isTransparent === null) return;
+
+    const inputData: InputData = {
+      regionCode: `${region}_${district}`,
+      region,
+      district,
+      itemCode,
+      isTransparent: isTransparent ?? false,
+      hasLabel,
+      isEmpty,
+      hasCap,
+      isCrushed,
+      isBroken,
+      isContaminated,
+    };
+
+    const result = judgeWaste(inputData);
+    onSubmit(inputData, result);
+  };
+
+  const isDisabled =
+    !region ||
+    !district ||
+    !itemCode ||
+    (itemCode === "PET_BOTTLE" && isTransparent === null);
 
   return (
     <main className="min-h-screen bg-linear-to-br from-emerald-50 via-white to-sky-50 px-6 py-10">
@@ -119,22 +106,49 @@ const MainInputPage = ({ onSubmit }: Props) => {
             </h1>
           </div>
 
-          <button className="rounded-2xl border border-gray-300 px-5 py-3 font-semibold text-gray-800 transition hover:bg-gray-50">
-            로그인
-          </button>
+          {loginEmail ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-gray-600">
+                {loginEmail}
+              </span>
+              <button
+                onClick={onLogout}
+                className="rounded-2xl border border-gray-300 px-5 py-3 font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                로그아웃
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={onLoginClick}
+                className="rounded-2xl border border-gray-300 px-5 py-3 font-semibold text-gray-800 transition hover:bg-gray-50"
+              >
+                로그인
+              </button>
+
+              <button
+                onClick={onSignupClick}
+                className="rounded-2xl bg-emerald-600 px-5 py-3 font-semibold text-white transition hover:bg-emerald-700"
+              >
+                회원가입
+              </button>
+            </div>
+          )}
         </header>
 
         <section className="mb-10 text-center">
           <p className="mb-3 text-sm font-bold text-emerald-600">
-            사진 + 지역 + 상태 정보를 함께 확인해요
+            품목에 따라 필요한 상태 정보를 다르게 입력해요
           </p>
           <h2 className="text-3xl font-extrabold leading-tight text-gray-900">
-            사진과 지역 정보를 바탕으로
+            지역과 품목 상태를 바탕으로
             <br />
             분리배출 방법을 판정합니다
           </h2>
           <p className="mt-4 text-gray-500">
-            AI가 틀릴 수 있으므로 직접 입력값을 함께 확인해주세요.
+            페트병은 무색 투명 여부를 먼저 확인하고, 다른 품목은 각 품목에 맞는
+            상태 조건을 확인합니다.
           </p>
         </section>
 
@@ -195,49 +209,187 @@ const MainInputPage = ({ onSubmit }: Props) => {
           <h3 className="mb-5 font-bold text-gray-900">✍️ 직접 입력</h3>
 
           <select
-            value={item}
-            onChange={(e) => setItem(e.target.value)}
+            value={itemCode}
+            onChange={(e) => {
+              const selectedValue = e.target.value as ItemCode | "";
+              setItemCode(selectedValue);
+              resetConditions();
+            }}
             className="mb-5 w-full rounded-2xl border border-gray-300 bg-white p-4 font-semibold text-gray-800 outline-none"
           >
             <option value="">품목 선택</option>
-            {itemOptions.map((itemOption) => (
-              <option key={itemOption.value} value={itemOption.value}>
-                {itemOption.label}
+            {itemOptions.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-              <input
-                type="checkbox"
-                checked={hasLabel}
-                onChange={(e) => setHasLabel(e.target.checked)}
-                className="h-5 w-5 accent-emerald-600"
-              />
-              라벨 있음
-            </label>
+          {itemCode === "PET_BOTTLE" && (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="radio"
+                    name="petType"
+                    checked={isTransparent === true}
+                    onChange={() => setIsTransparent(true)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  무색 투명 페트병
+                </label>
 
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-              <input
-                type="checkbox"
-                checked={hasLeftover}
-                onChange={(e) => setHasLeftover(e.target.checked)}
-                className="h-5 w-5 accent-emerald-600"
-              />
-              내용물 남음
-            </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="radio"
+                    name="petType"
+                    checked={isTransparent === false}
+                    onChange={() => setIsTransparent(false)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  유색 / 불투명 페트병
+                </label>
 
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-              <input
-                type="checkbox"
-                checked={hasCap}
-                onChange={(e) => setHasCap(e.target.checked)}
-                className="h-5 w-5 accent-emerald-600"
-              />
-              뚜껑 있음
-            </label>
-          </div>
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={hasLabel}
+                    onChange={(e) => setHasLabel(e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  라벨 있음
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={!isEmpty}
+                    onChange={(e) => setIsEmpty(!e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  내용물 남음
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={hasCap}
+                    onChange={(e) => setHasCap(e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  뚜껑 있음
+                </label>
+              </div>
+
+              <div className="mt-5 rounded-2xl bg-emerald-50 p-4 text-sm leading-relaxed text-emerald-700">
+                무색 투명 생수·음료 페트병은 투명 페트병 별도배출 대상이고,
+                유색 페트병이나 그 외 플라스틱 용기는 일반 플라스틱류로
+                배출합니다.
+              </div>
+            </>
+          )}
+
+          {itemCode === "CAN" && (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={!isEmpty}
+                    onChange={(e) => setIsEmpty(!e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  내용물 남음
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={isCrushed}
+                    onChange={(e) => setIsCrushed(e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  압착됨
+                </label>
+              </div>
+
+              <div className="mt-5 rounded-2xl bg-sky-50 p-4 text-sm leading-relaxed text-sky-700">
+                캔은 내용물을 비우고 가능하면 압착한 뒤 캔류로 배출합니다.
+              </div>
+            </>
+          )}
+
+          {itemCode === "GLASS_BOTTLE" && (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={!isEmpty}
+                    onChange={(e) => setIsEmpty(!e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  내용물 남음
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={hasCap}
+                    onChange={(e) => setHasCap(e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  뚜껑 있음
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={isBroken}
+                    onChange={(e) => setIsBroken(e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  깨짐
+                </label>
+              </div>
+
+              <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-relaxed text-amber-700">
+                유리병은 내용물을 비우고 뚜껑이 다른 재질이면 분리해서
+                배출합니다. 깨진 유리는 별도 주의가 필요합니다.
+              </div>
+            </>
+          )}
+
+          {itemCode === "PLASTIC_CONTAINER" && (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={!isEmpty}
+                    onChange={(e) => setIsEmpty(!e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  내용물 남음
+                </label>
+
+                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={isContaminated}
+                    onChange={(e) => setIsContaminated(e.target.checked)}
+                    className="h-5 w-5 accent-emerald-600"
+                  />
+                  오염 있음
+                </label>
+              </div>
+
+              <div className="mt-5 rounded-2xl bg-purple-50 p-4 text-sm leading-relaxed text-purple-700">
+                플라스틱 용기는 내용물을 비우고 오염물을 제거한 뒤 플라스틱류로
+                배출합니다.
+              </div>
+            </>
+          )}
         </section>
 
         <button
