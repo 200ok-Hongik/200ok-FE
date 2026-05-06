@@ -102,7 +102,7 @@ const ResultPage = ({
             <ol className="space-y-3">
               {result.requiredAction.map((action, index) => (
                 <li
-                  key={action}
+                  key={`${action}-${index}`}
                   className="flex gap-3 font-semibold text-gray-700"
                 >
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-sm text-emerald-700">

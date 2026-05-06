@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { InputData, ItemCode, Result } from "../types/recycle";
-import { judgeWaste } from "../utils/judgePetBottle";
+import { requestRecycleResult } from "../utils/recycleApi";
 
 type Props = {
   loginEmail: string | null;
@@ -30,6 +30,7 @@ const MainInputPage = ({
   const [isCrushed, setIsCrushed] = useState(false);
   const [isBroken, setIsBroken] = useState(false);
   const [isContaminated, setIsContaminated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const districtOptions: Record<string, { label: string; value: string }[]> = {
     SEOUL: [
@@ -65,7 +66,7 @@ const MainInputPage = ({
     setIsContaminated(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!itemCode) return;
     if (itemCode === "PET_BOTTLE" && isTransparent === null) return;
 
@@ -83,11 +84,22 @@ const MainInputPage = ({
       isContaminated,
     };
 
-    const result = judgeWaste(inputData);
-    onSubmit(inputData, result);
+    try {
+      setIsLoading(true);
+
+      const result = await requestRecycleResult(inputData);
+
+      onSubmit(inputData, result);
+    } catch (error) {
+      console.error(error);
+      alert("서버 요청 중 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const isDisabled =
+    isLoading ||
     !region ||
     !district ||
     !itemCode ||
@@ -288,108 +300,6 @@ const MainInputPage = ({
               </div>
             </>
           )}
-
-          {itemCode === "CAN" && (
-            <>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={!isEmpty}
-                    onChange={(e) => setIsEmpty(!e.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  내용물 남음
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={isCrushed}
-                    onChange={(e) => setIsCrushed(e.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  압착됨
-                </label>
-              </div>
-
-              <div className="mt-5 rounded-2xl bg-sky-50 p-4 text-sm leading-relaxed text-sky-700">
-                캔은 내용물을 비우고 가능하면 압착한 뒤 캔류로 배출합니다.
-              </div>
-            </>
-          )}
-
-          {itemCode === "GLASS_BOTTLE" && (
-            <>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={!isEmpty}
-                    onChange={(e) => setIsEmpty(!e.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  내용물 남음
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={hasCap}
-                    onChange={(e) => setHasCap(e.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  뚜껑 있음
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={isBroken}
-                    onChange={(e) => setIsBroken(e.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  깨짐
-                </label>
-              </div>
-
-              <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-relaxed text-amber-700">
-                유리병은 내용물을 비우고 뚜껑이 다른 재질이면 분리해서
-                배출합니다. 깨진 유리는 별도 주의가 필요합니다.
-              </div>
-            </>
-          )}
-
-          {itemCode === "PLASTIC_CONTAINER" && (
-            <>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={!isEmpty}
-                    onChange={(e) => setIsEmpty(!e.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  내용물 남음
-                </label>
-
-                <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={isContaminated}
-                    onChange={(e) => setIsContaminated(e.target.checked)}
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  오염 있음
-                </label>
-              </div>
-
-              <div className="mt-5 rounded-2xl bg-purple-50 p-4 text-sm leading-relaxed text-purple-700">
-                플라스틱 용기는 내용물을 비우고 오염물을 제거한 뒤 플라스틱류로
-                배출합니다.
-              </div>
-            </>
-          )}
         </section>
 
         <button
@@ -397,7 +307,7 @@ const MainInputPage = ({
           disabled={isDisabled}
           className="mt-8 w-full rounded-3xl bg-emerald-600 py-5 text-lg font-extrabold text-white shadow-lg transition hover:bg-emerald-700 disabled:bg-gray-300"
         >
-          판정 시작하기
+          {isLoading ? "판정 중..." : "판정 시작하기"}
         </button>
       </div>
     </main>
