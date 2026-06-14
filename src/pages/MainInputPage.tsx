@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { InputData, ItemCode, Result } from "../types/recycle";
 import { requestRecycleResult } from "../utils/recycleApi";
+import { requestAiDetectResult } from "../utils/aiDetectApi";
 
 type Props = {
   loginEmail: string | null;
@@ -30,7 +31,10 @@ const MainInputPage = ({
   const [isCrushed, setIsCrushed] = useState(false);
   const [isBroken, setIsBroken] = useState(false);
   const [isContaminated, setIsContaminated] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
 
   const districtOptions: Record<string, { label: string; value: string }[]> = {
     SEOUL: [
@@ -53,6 +57,7 @@ const MainInputPage = ({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setImage(e.target.files[0]);
+      setAiMessage("");
     }
   };
 
@@ -64,6 +69,82 @@ const MainInputPage = ({
     setIsCrushed(false);
     setIsBroken(false);
     setIsContaminated(false);
+  };
+
+  const getAiLabel = (detailCode: string, detectedItemCode: string) => {
+    if (
+      detailCode === "CLEAR" ||
+      detailCode === "CLEAR_SINGLE" ||
+      detailCode === "TRANSPARENT"
+    ) {
+      return "무색 투명 페트병";
+    }
+
+    if (
+      detailCode === "COLORED" ||
+      detailCode === "COLORED_SINGLE" ||
+      detailCode === "OPAQUE"
+    ) {
+      return "유색 / 불투명 페트병";
+    }
+
+    if (detectedItemCode === "PET_BOTTLE") {
+      return "페트병";
+    }
+
+    return detectedItemCode || "알 수 없는 품목";
+  };
+
+  const handleAnalyzeImage = async () => {
+    if (!image) {
+      alert("이미지를 먼저 업로드해주세요.");
+      return;
+    }
+
+    try {
+      setIsAiLoading(true);
+      setAiMessage("");
+
+      const aiResult = await requestAiDetectResult(image);
+
+      console.log("프론트에서 받은 AI 결과:", aiResult);
+
+      if (aiResult.itemCode === "PET_BOTTLE") {
+        setItemCode("PET_BOTTLE");
+      }
+
+      if (aiResult.conditions?.isTransparent === true) {
+        setIsTransparent(true);
+      }
+
+      if (aiResult.conditions?.isTransparent === false) {
+        setIsTransparent(false);
+      }
+
+      if (typeof aiResult.conditions?.hasLabel === "boolean") {
+        setHasLabel(aiResult.conditions.hasLabel);
+      }
+
+      if (typeof aiResult.conditions?.hasCap === "boolean") {
+        setHasCap(aiResult.conditions.hasCap);
+      }
+
+      if (typeof aiResult.conditions?.isEmpty === "boolean") {
+        setIsEmpty(aiResult.conditions.isEmpty);
+      }
+
+      const confidencePercent = Math.round(aiResult.confidence * 100);
+      const aiLabel = getAiLabel(aiResult.detailCode, aiResult.itemCode);
+
+      setAiMessage(
+        `AI 분석 결과: ${aiLabel}로 인식했습니다. 신뢰도 ${confidencePercent}%`
+      );
+    } catch (error) {
+      console.error(error);
+      alert("AI 이미지 분석 중 오류가 발생했습니다. 백엔드 AI API 연결을 확인해주세요.");
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -183,6 +264,21 @@ const MainInputPage = ({
                 className="hidden"
               />
             </label>
+
+            <button
+              type="button"
+              onClick={handleAnalyzeImage}
+              disabled={!image || isAiLoading}
+              className="mt-4 w-full rounded-2xl bg-gray-900 py-3 font-bold text-white transition hover:bg-gray-800 disabled:bg-gray-300"
+            >
+              {isAiLoading ? "AI 분석 중..." : "AI로 이미지 분석하기"}
+            </button>
+
+            {aiMessage && (
+              <div className="mt-4 rounded-2xl bg-emerald-50 p-4 text-sm font-semibold leading-relaxed text-emerald-700">
+                {aiMessage}
+              </div>
+            )}
           </div>
 
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -226,6 +322,7 @@ const MainInputPage = ({
               const selectedValue = e.target.value as ItemCode | "";
               setItemCode(selectedValue);
               resetConditions();
+              setAiMessage("");
             }}
             className="mb-5 w-full rounded-2xl border border-gray-300 bg-white p-4 font-semibold text-gray-800 outline-none"
           >

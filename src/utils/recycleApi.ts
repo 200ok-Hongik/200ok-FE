@@ -1,6 +1,6 @@
 import type { InputData, Result } from "../types/recycle";
 
-const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api/recycle`;
+const API_URL = "/api/recycle";
 
 export const requestRecycleResult = async (
   data: InputData
