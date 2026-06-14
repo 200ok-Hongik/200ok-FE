@@ -197,7 +197,7 @@ const MainInputPage = ({
               className="mb-4 w-full rounded-2xl border border-gray-300 bg-white p-4 font-semibold text-gray-800 outline-none"
             >
               <option value="">시/도 선택</option>
-              <option value="SEOUL">서울시</option>
+              <option value="SEOUL">서울특별시</option>
               <option value="GYEONGGI">경기도</option>
             </select>
 

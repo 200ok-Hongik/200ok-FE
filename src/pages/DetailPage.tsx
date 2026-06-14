@@ -48,7 +48,7 @@ const DetailPage = ({ data, result, onBack }: Props) => {
 
           <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="mb-4 text-sm font-bold text-sky-600">
-              투명/유색 분기 기준
+              무색(투명)/유색 분기 기준
             </p>
 
             <div className="rounded-3xl bg-sky-50 p-6">
@@ -65,7 +65,7 @@ const DetailPage = ({ data, result, onBack }: Props) => {
                   • 현재 입력값은{" "}
                   <strong>
                     {data.isTransparent
-                      ? "무색 투명 페트병"
+                      ? "무색(투명) 페트병"
                       : "유색/불투명 페트병"}
                   </strong>
                   으로 처리되었습니다.
