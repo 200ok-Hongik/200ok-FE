@@ -4,9 +4,6 @@
 >
 > 사용자가 재활용품 이미지를 업로드하면 AI 분석 결과를 바탕으로 품목을 판별하고, 올바른 분리배출 방법을 안내하는 앱 서비스입니다.
 
-🌐 Demo
-https://ai-recycling-frontend.vercel.app
-
 ---
 
 # 📖 프로젝트 소개
@@ -92,10 +89,6 @@ src
 ---
 
 # 🚀 서비스 링크
-
-### GitHub
-
-https://github.com/sumin0423/AI-Recycling-Frontend
 
 ### Demo
 
