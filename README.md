@@ -1,144 +1,56 @@
-# ♻️ AI Recycling Frontend
+# Welcome to your Expo app 👋
 
-> AI 기반 재활용품 분리배출 서비스의 프론트엔드입니다.
->
-> 사용자가 재활용품 이미지를 업로드하면 AI 분석 결과를 바탕으로 품목을 판별하고, 올바른 분리배출 방법을 안내하는 앱 서비스입니다.
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
----
+## Get started
 
-# 📖 프로젝트 소개
+1. Install dependencies
 
-AI 기반 재활용품 분리배출 서비스를 위한 프론트엔드 프로젝트입니다.
+   ```bash
+   npm install
+   ```
 
-사용자는 재활용품 이미지를 업로드하고 지역과 배출 조건을 선택하면 AI가 품목을 분석하여 분리배출 방법을 안내받을 수 있습니다. 단순히 AI 분석 결과를 보여주는 것이 아니라 사용자가 이해하기 쉬운 형태로 결과와 분리배출 가이드를 제공하는 것에 중점을 두었습니다.
+2. Start the app
 
-프로젝트는 홍익대학교 컴퓨터공학과 졸업 프로젝트로 진행되며, 현재 레포지토리는 프론트엔드 개발을 보여주며 사용자 화면 구현과 API 연동을 담당합니다.
+   ```bash
+   npx expo start
+   ```
 
----
+In the output, you'll find options to open the app in a
 
-# 🛠 Tech Stack
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-### Frontend
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-- React Router DOM
+## Get a fresh project
 
-### API
+When you're ready, run:
 
-- REST API
-- Fetch API
-
-### Tools
-
-- Git
-- GitHub
-- Figma
-- Notion
-
----
-
-# 👩‍💻 담당 역할
-
-Frontend 100%
-
-- 전체 UI 구현
-- 로그인 / 회원가입 페이지 개발
-- 메인 입력 화면 개발
-- AI 분석 결과 페이지 개발
-- 상세 분리배출 안내 페이지 개발
-- 사용자 피드백 기능 개발
-- Backend API 연동
-- 사용자 입력값 검증 및 상태 관리
-
----
-
-# ✨ 주요 기능
-
-- 회원가입 및 로그인
-- 재활용품 이미지 업로드
-- 지역 및 배출 조건 선택
-- AI 분석 결과 조회
-- 품목별 분리배출 방법 안내
-- 상세 분리배출 가이드 제공
-- 사용자 피드백 제출
-
----
-
-# 📂 프로젝트 구조
-
-```text
-src
-├── assets
-├── pages
-│   ├── MainInputPage
-│   ├── ResultPage
-│   ├── DetailPage
-│   ├── LoginPage
-│   ├── SignupPage
-│   ├── FeedbackPage
-│   └── FeedbackCompletePage
-├── types
-├── utils
-├── App.tsx
-└── main.tsx
+```bash
+npm run reset-project
 ```
 
----
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
-# 🚀 서비스 링크
+### Other setup steps
 
-### Demo
+- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
+- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
+- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
 
-https://ai-recycling-frontend.vercel.app
+## Learn more
 
----
+To learn more about developing your project with Expo, look at the following resources:
 
-# 🔧 Trouble Shooting
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-## 1. AI 결과와 사용자 입력 데이터 구조 통일
+## Join the community
 
-### 문제
+Join our community of developers creating universal apps.
 
-AI 서버와 Backend의 응답 구조가 변경되면서 프론트엔드에서 데이터를 정상적으로 처리하지 못하는 문제가 발생했습니다.
-
-### 해결
-
-응답 타입을 다시 정의하고 공통 인터페이스를 작성하여 API 응답을 일관된 형태로 관리하도록 수정했습니다.
-
----
-
-## 2. 지역별 분리배출 조건 처리
-
-### 문제
-
-지역마다 분리배출 기준이 달라 동일한 품목이라도 결과가 달라져야 했습니다.
-
-### 해결
-
-사용자가 선택한 지역과 조건을 함께 전달하도록 API 요청 구조를 수정하고 결과 페이지에서도 해당 정보를 함께 출력하도록 구현했습니다.
-
----
-
-## 3. 사용자 입력 검증
-
-### 문제
-
-필수 정보를 입력하지 않아도 다음 단계로 이동하는 문제가 있었습니다.
-
-### 해결
-
-입력값 검증 로직을 추가하여 이미지, 지역, 조건이 모두 선택된 경우에만 AI 분석이 진행되도록 개선했습니다.
-
----
-
-# 📌 프로젝트 정보
-
-| 구분 | 내용 |
-|------|------|
-| 프로젝트 | AI 기반 재활용품 분리배출 서비스 |
-| 기간 | 2026.03 ~ 진행 중 |
-| 형태 | 컴퓨터공학과 졸업 프로젝트 |
-| 담당 | Frontend 개발 |
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
