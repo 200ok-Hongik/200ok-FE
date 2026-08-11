@@ -229,11 +229,11 @@ const styles = StyleSheet.create({
   },
   previewFrameGroup: {
     width: '100%',
-    height: 414,
+    height: 430,
   },
   previewPhone: {
     alignSelf: 'center',
-    width: '60%',
+    width: '65%',
     aspectRatio: 199 / 404,
   },
   previewScreen: {
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 29,
+    bottom: 25,
     minHeight: 82,
     flexDirection: 'row',
     alignItems: 'center',
