@@ -148,12 +148,14 @@ export default function HomeScreen() {
           </View>
         </Card>
 
-        <View style={styles.statBadgeBackground}>
-          <Image
-            source={require('../../../assets/images/recycling-stat.png')}
-            style={styles.statBadgeImage}
-            contentFit="contain"
-          />
+        <View style={styles.statBadge}>
+          <View style={styles.statBadgeInfo}>
+            <Ionicons name="trash" size={17} color="#FFFFFF" />
+            <Text style={styles.statBadgeLabel}>7월 누적 재활용</Text>
+          </View>
+          <View style={styles.statBadgeCountPill}>
+            <Text style={styles.statBadgeCount}>+ 12</Text>
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
@@ -298,16 +300,29 @@ const styles = StyleSheet.create({
   scanCardButtons: { gap: 8 },
   cardButton: { height: 48, borderRadius: 7 },
   cardButtonLabel: { fontSize: 13, lineHeight: 17, fontWeight: '600' },
-  statBadgeBackground: {
+  statBadge: {
     marginTop: 12,
     alignSelf: 'center',
     width: 200,
     height: 27,
-    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 10,
+    paddingRight: 2,
+    borderRadius: 13.5,
     backgroundColor: '#FF8908',
-    overflow: 'hidden',
   },
-  statBadgeImage: { width: 200, height: 27 },
+  statBadgeInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statBadgeLabel: { color: '#FFFFFF', fontSize: 11, lineHeight: 14, fontWeight: '700', letterSpacing: -0.3 },
+  statBadgeCountPill: {
+    width: 62,
+    height: 23,
+    borderRadius: 11.5,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statBadgeCount: { color: '#169B5C', fontSize: 11, lineHeight: 14, fontWeight: '800' },
   sectionTitle: {
     marginTop: 24,
     fontSize: 15,
