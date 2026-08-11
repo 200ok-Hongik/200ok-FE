@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,6 +13,7 @@ import { getProfile, logout, type UserProfile } from '@/services/api';
 export default function MyPageScreen() {
   const [notifyOn, setNotifyOn] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,12 +28,20 @@ export default function MyPageScreen() {
   }, []);
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+
     try {
       await logout();
     } catch (error) {
       console.warn('로그아웃 API 호출에 실패했습니다.', error);
     } finally {
-      router.replace('/');
+      if (Platform.OS === 'web') {
+        window.location.replace('/');
+      } else {
+        router.dismissAll();
+        router.replace('/');
+      }
     }
   };
 
@@ -44,7 +53,20 @@ export default function MyPageScreen() {
     <LinearGradient colors={[Colors.mint, Colors.background]} style={styles.flex}>
       <SafeAreaView style={styles.flex} edges={['top']}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.logo}>로고</Text>
+          <View style={styles.topRow}>
+            <Text style={styles.logo}>SSOK</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="로그아웃"
+              disabled={isLoggingOut}
+              onPress={handleLogout}
+              style={({ pressed }) => [styles.topLogout, pressed && styles.pressed]}>
+              <Ionicons name="log-out-outline" size={18} color={Colors.textSecondary} />
+              <Text style={styles.topLogoutLabel}>
+                {isLoggingOut ? '로그아웃 중' : '로그아웃'}
+              </Text>
+            </Pressable>
+          </View>
 
           <View style={styles.profileRow}>
             <Text style={styles.profileText}>
@@ -96,8 +118,13 @@ export default function MyPageScreen() {
                 thumbColor="#FFFFFF"
               />
             </View>
-            <Pressable style={styles.settingRow} onPress={handleLogout}>
-              <Text style={styles.logoutLabel}>로그아웃</Text>
+            <Pressable
+              disabled={isLoggingOut}
+              style={({ pressed }) => [styles.settingRow, pressed && styles.pressed]}
+              onPress={handleLogout}>
+              <Text style={styles.logoutLabel}>
+                {isLoggingOut ? '로그아웃 중이에요…' : '로그아웃'}
+              </Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -109,7 +136,24 @@ export default function MyPageScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxl },
-  logo: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecondary, marginTop: Spacing.sm },
+  topRow: {
+    marginTop: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logo: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.primary },
+  topLogout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+  },
+  topLogoutLabel: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecondary },
+  pressed: { opacity: 0.6 },
   profileRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
