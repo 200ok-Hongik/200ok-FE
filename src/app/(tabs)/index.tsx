@@ -258,8 +258,9 @@ const styles = StyleSheet.create({
     color: '#12A85F',
     fontSize: 25,
     lineHeight: 28,
-    fontWeight: '900',
-    letterSpacing: -1.5,
+    fontFamily: 'Arial',
+    fontWeight: '700',
+    letterSpacing: -0.8,
   },
   notificationWrap: {
     width: 28,
