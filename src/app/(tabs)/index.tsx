@@ -161,6 +161,7 @@ export default function HomeScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.frequentScroller}
           contentContainerStyle={styles.frequentRow}>
             {FrequentItems.map((item) => (
               <View key={item.id} style={styles.frequentItem}>
@@ -345,8 +346,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
   },
-  frequentRow: { flexDirection: 'row', gap: 16, marginTop: 12, paddingRight: 16 },
-  frequentItem: { width: 64, alignItems: 'center', gap: 4 },
+  frequentScroller: { marginHorizontal: -5 },
+  frequentRow: { flexDirection: 'row', gap: 16, marginTop: 16, paddingHorizontal: 5, paddingRight: 21 },
+  frequentItem: { width: 64, alignItems: 'center', gap: 9 },
   frequentIconWrap: {
     width: 64,
     height: 64,
