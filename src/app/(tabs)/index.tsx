@@ -148,11 +148,13 @@ export default function HomeScreen() {
           </View>
         </Card>
 
-        <Image
-          source={require('../../../assets/images/recycling-stat.png')}
-          style={styles.statBadgeImage}
-          contentFit="contain"
-        />
+        <View style={styles.statBadgeBackground}>
+          <Image
+            source={require('../../../assets/images/recycling-stat.png')}
+            style={styles.statBadgeImage}
+            contentFit="contain"
+          />
+        </View>
 
         <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
         <Image
@@ -296,12 +298,16 @@ const styles = StyleSheet.create({
   scanCardButtons: { gap: 8 },
   cardButton: { height: 48, borderRadius: 7 },
   cardButtonLabel: { fontSize: 13, lineHeight: 17, fontWeight: '600' },
-  statBadgeImage: {
+  statBadgeBackground: {
     marginTop: 12,
     alignSelf: 'center',
     width: 200,
     height: 27,
+    borderRadius: 14,
+    backgroundColor: '#FF8908',
+    overflow: 'hidden',
   },
+  statBadgeImage: { width: 200, height: 27 },
   sectionTitle: {
     marginTop: 24,
     fontSize: 15,
