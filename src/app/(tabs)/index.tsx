@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -30,14 +31,11 @@ function WebStatusBar() {
 
 function RecyclingArt() {
   return (
-    <View style={styles.recyclingArt}>
-      <View style={styles.artBottle} />
-      <View style={styles.artPaper} />
-      <View style={styles.artCan} />
-      <View style={styles.artBin}>
-        <Ionicons name="refresh" size={18} color="#FFFFFF" />
-      </View>
-    </View>
+    <Image
+      source={require('../../../assets/images/recycling-bin.png')}
+      style={styles.recyclingArt}
+      contentFit="contain"
+    />
   );
 }
 
@@ -160,16 +158,19 @@ export default function HomeScreen() {
         </Pressable>
 
         <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
-        <View style={styles.frequentRow}>
-          {FrequentItems.map((item) => (
-            <View key={item.id} style={styles.frequentItem}>
-              <View style={styles.frequentIconWrap}>
-                <Ionicons name={item.icon} size={22} color={Colors.text} />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.frequentRow}>
+            {FrequentItems.map((item) => (
+              <View key={item.id} style={styles.frequentItem}>
+                <View style={styles.frequentIconWrap}>
+                  <Ionicons name={item.icon} size={22} color={Colors.text} />
+                </View>
+                <Text style={styles.frequentLabel}>{item.label}</Text>
               </View>
-              <Text style={styles.frequentLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+        </ScrollView>
       </ScrollView>
 
       <OverlayModal visible={reminderVisible} animationType="fade">
@@ -290,56 +291,17 @@ const styles = StyleSheet.create({
     minHeight: 300,
     padding: 16,
     borderRadius: 16,
+    backgroundColor: '#F5F9F7',
     justifyContent: 'space-between',
   },
   scanCardRow: { flexDirection: 'row', alignItems: 'flex-start' },
   scanCardTitle: { fontSize: 17, lineHeight: 22, fontWeight: '800', color: Colors.text },
   scanCardDesc: { marginTop: 12, color: Colors.textSecondary, fontSize: 12, lineHeight: 18 },
   recyclingArt: {
-    width: 90,
-    height: 110,
-    position: 'relative',
-  },
-  artBin: {
-    position: 'absolute',
-    right: 4,
-    bottom: 8,
-    width: 45,
-    height: 32,
-    borderRadius: 3,
-    backgroundColor: '#0BAB62',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-7deg' }],
-  },
-  artBottle: {
-    position: 'absolute',
-    right: 18,
-    top: 14,
-    width: 12,
-    height: 47,
-    borderRadius: 4,
-    backgroundColor: '#8CCB73',
-    transform: [{ rotate: '16deg' }],
-  },
-  artPaper: {
-    position: 'absolute',
-    right: 40,
-    top: 22,
-    width: 28,
-    height: 37,
-    backgroundColor: '#D7D1C0',
-    transform: [{ rotate: '-24deg' }],
-  },
-  artCan: {
-    position: 'absolute',
-    right: 2,
-    top: 31,
-    width: 14,
-    height: 35,
-    borderRadius: 3,
-    backgroundColor: '#B9C1B6',
-    transform: [{ rotate: '25deg' }],
+    width: 112,
+    height: 125,
+    marginTop: -5,
+    marginRight: -4,
   },
   scanCardButtons: { gap: 8 },
   cardButton: { height: 48, borderRadius: 7 },
@@ -383,8 +345,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
   },
-  frequentRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
-  frequentItem: { flex: 1, alignItems: 'center', gap: 4 },
+  frequentRow: { flexDirection: 'row', gap: 16, marginTop: 12, paddingRight: 16 },
+  frequentItem: { width: 64, alignItems: 'center', gap: 4 },
   frequentIconWrap: {
     width: 64,
     height: 64,
