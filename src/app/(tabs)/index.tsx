@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { FrequentItems } from '@/constants/mockData';
 import { getHomeSummary, getProfile, submitScanFeedback, type HomeSummary, type UserProfile } from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -159,12 +160,21 @@ export default function HomeScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
-        <Image
-          source={require('../../../assets/images/frequent-items.png')}
-          style={styles.frequentItemsImage}
-          contentFit="contain"
-          contentPosition="left center"
-        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator
+          persistentScrollbar
+          style={styles.frequentScroller}
+          contentContainerStyle={styles.frequentRow}>
+          {FrequentItems.map((item) => (
+            <View key={item.id} style={styles.frequentItem}>
+              <View style={styles.frequentIconWrap}>
+                <Ionicons name={item.icon} size={23} color="#171C1A" />
+              </View>
+              <Text style={styles.frequentLabel}>{item.label}</Text>
+            </View>
+          ))}
+        </ScrollView>
       </ScrollView>
 
       <OverlayModal visible={reminderVisible} animationType="fade">
@@ -337,11 +347,27 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
   },
-  frequentItemsImage: {
-    width: 359,
-    height: 89,
+  frequentScroller: {
     marginTop: 16,
     marginLeft: -5,
+    marginRight: -16,
+    paddingBottom: 7,
+  },
+  frequentRow: { flexDirection: 'row', gap: 16, paddingLeft: 5, paddingRight: 16 },
+  frequentItem: { width: 64, alignItems: 'center', gap: 9 },
+  frequentIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    backgroundColor: '#E8F8F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  frequentLabel: {
+    color: '#4B4F4D',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
   },
 
   reminderBackdrop: {
