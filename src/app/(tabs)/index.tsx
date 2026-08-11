@@ -9,8 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { OverlayModal } from '@/components/ui/OverlayModal';
-import { Colors, FontSize, Radius, Shadow, Spacing } from '@/constants/theme';
-import { FrequentItems } from '@/constants/mockData';
+import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { getHomeSummary, getProfile, submitScanFeedback, type HomeSummary, type UserProfile } from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -149,29 +148,19 @@ export default function HomeScreen() {
           </View>
         </Card>
 
-        <Pressable style={styles.statBadge}>
-          <View style={styles.statBadgeLead}>
-            <Ionicons name="trash" size={15} color="#FFFFFF" />
-            <Text style={styles.statBadgeText}>7월 누적 재활용</Text>
-          </View>
-          <Text style={styles.statBadgeCount}>+ 12</Text>
-        </Pressable>
+        <Image
+          source={require('../../../assets/images/recycling-stat.png')}
+          style={styles.statBadgeImage}
+          contentFit="contain"
+        />
 
         <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.frequentScroller}
-          contentContainerStyle={styles.frequentRow}>
-            {FrequentItems.map((item) => (
-              <View key={item.id} style={styles.frequentItem}>
-                <View style={styles.frequentIconWrap}>
-                  <Ionicons name={item.icon} size={22} color={Colors.text} />
-                </View>
-                <Text style={styles.frequentLabel}>{item.label}</Text>
-              </View>
-            ))}
-        </ScrollView>
+        <Image
+          source={require('../../../assets/images/frequent-items.png')}
+          style={styles.frequentItemsImage}
+          contentFit="contain"
+          contentPosition="left center"
+        />
       </ScrollView>
 
       <OverlayModal visible={reminderVisible} animationType="fade">
@@ -307,37 +296,11 @@ const styles = StyleSheet.create({
   scanCardButtons: { gap: 8 },
   cardButton: { height: 48, borderRadius: 7 },
   cardButtonLabel: { fontSize: 13, lineHeight: 17, fontWeight: '600' },
-  statBadge: {
+  statBadgeImage: {
     marginTop: 12,
     alignSelf: 'center',
-    width: 214,
-    height: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#FF8908',
-    borderRadius: Radius.pill,
-    overflow: 'hidden',
-  },
-  statBadgeLead: {
-    height: '100%',
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    backgroundColor: '#FF8908',
-    borderTopRightRadius: Radius.pill,
-    borderBottomRightRadius: Radius.pill,
-  },
-  statBadgeText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
-  statBadgeCount: {
-    color: '#16A34A',
-    width: 52,
-    textAlign: 'center',
-    fontWeight: '800',
-    fontSize: 10,
+    width: 200,
+    height: 27,
   },
   sectionTitle: {
     marginTop: 24,
@@ -346,19 +309,12 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
   },
-  frequentScroller: { marginHorizontal: -5 },
-  frequentRow: { flexDirection: 'row', gap: 16, marginTop: 16, paddingHorizontal: 5, paddingRight: 21 },
-  frequentItem: { width: 64, alignItems: 'center', gap: 9 },
-  frequentIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    backgroundColor: '#ECFAF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadow,
+  frequentItemsImage: {
+    width: 359,
+    height: 89,
+    marginTop: 16,
+    marginLeft: -5,
   },
-  frequentLabel: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
 
   reminderBackdrop: {
     position: 'absolute',
