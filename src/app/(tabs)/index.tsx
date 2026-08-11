@@ -108,11 +108,12 @@ export default function HomeScreen() {
       <WebStatusBar />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.logo}>SSOK</Text>
-          <View style={styles.notificationWrap}>
-            <Ionicons name="notifications" size={24} color="#16864E" />
-            {hasUnreadNotifications && <View style={styles.notificationDot} />}
-          </View>
+          <Image
+            source={require('../../../assets/images/home-header.png')}
+            style={styles.headerImage}
+            contentFit="contain"
+          />
+          {!hasUnreadNotifications && <View style={styles.notificationDotMask} />}
         </View>
 
         <Text style={styles.heading}>
@@ -248,27 +249,19 @@ const styles = StyleSheet.create({
   webStatusIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   scroll: { paddingHorizontal: 16, paddingBottom: 18 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingTop: 14,
     paddingBottom: 10,
+    position: 'relative',
   },
-  logo: { fontSize: 27, lineHeight: 32, fontWeight: '800', color: '#12A85F', letterSpacing: -1.2 },
-  notificationWrap: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationDot: {
+  headerImage: { width: '100%', height: 24 },
+  notificationDotMask: {
     position: 'absolute',
-    top: 1,
+    top: 14,
     right: 0,
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: Colors.background,
   },
   heading: { marginTop: 14, fontSize: 26, lineHeight: 33, fontWeight: '800', color: Colors.text, letterSpacing: -0.8 },
   headingAccent: { color: Colors.primaryDark },
