@@ -32,7 +32,7 @@ function WebStatusBar() {
 function RecyclingArt() {
   return (
     <Image
-      source={require('../../../assets/images/recycling-bin.png')}
+      source={require('../../../assets/images/recycling-bin.svg')}
       style={styles.recyclingArt}
       contentFit="contain"
     />
