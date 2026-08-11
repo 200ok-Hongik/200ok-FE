@@ -11,11 +11,11 @@ import { MockDetections } from '@/constants/mockData';
 import { uploadScan } from '@/services/api';
 
 const TAB_ICONS = [
-  { name: 'home-outline' as const, label: '홈' },
-  { name: 'time-outline' as const, label: '기록' },
-  { name: 'scan' as const, label: '스캔' },
-  { name: 'bookmark-outline' as const, label: '가이드' },
-  { name: 'person-outline' as const, label: 'My' },
+  { name: 'home-outline' as const, label: '홈', route: '/(tabs)' as const },
+  { name: 'time-outline' as const, label: '기록', route: '/(tabs)/history' as const },
+  { name: 'scan' as const, label: '스캔', route: null },
+  { name: 'bookmark-outline' as const, label: '가이드', route: '/(tabs)/guide' as const },
+  { name: 'person-outline' as const, label: 'My', route: '/(tabs)/mypage' as const },
 ];
 
 export default function ScanCameraScreen() {
@@ -136,7 +136,14 @@ export default function ScanCameraScreen() {
 
           <View style={styles.tabRow}>
             {TAB_ICONS.map((tab) => (
-              <View key={tab.label} style={styles.tabItem}>
+              <Pressable
+                key={tab.label}
+                accessibilityRole="button"
+                accessibilityLabel={`${tab.label} 화면으로 이동`}
+                disabled={!tab.route}
+                hitSlop={8}
+                onPress={() => tab.route && router.replace(tab.route)}
+                style={({ pressed }) => [styles.tabItem, pressed && styles.tabItemPressed]}>
                 <View style={tab.label === '스캔' ? styles.tabScanIcon : undefined}>
                   <Ionicons
                     name={tab.name}
@@ -145,7 +152,7 @@ export default function ScanCameraScreen() {
                   />
                 </View>
                 <Text style={[styles.tabLabel, tab.label === '스캔' && styles.tabLabelActive]}>{tab.label}</Text>
-              </View>
+              </Pressable>
             ))}
           </View>
         </View>
@@ -257,7 +264,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
   },
-  tabItem: { alignItems: 'center', gap: 4 },
+  tabItem: { minWidth: 52, minHeight: 52, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  tabItemPressed: { opacity: 0.55 },
   tabScanIcon: {
     width: 30,
     height: 30,
