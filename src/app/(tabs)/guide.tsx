@@ -1,4 +1,4 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -70,7 +70,11 @@ export default function GuideScreen() {
               <Text style={styles.heroEyebrow}>올바른 분리배출을 위한</Text>
               <Text style={styles.heroTitle}>내 손안의 분리배출</Text>
             </View>
-            <MaterialCommunityIcons name="recycle" size={84} color="rgba(221,255,235,0.72)" />
+            <Image
+              source={require('../../../assets/images/guide-recycle.svg')}
+              style={styles.heroArt}
+              contentFit="contain"
+            />
           </View>
           <View style={styles.heroDots}>
             <View style={styles.heroDotLong} />
@@ -179,6 +183,7 @@ const styles = StyleSheet.create({
   },
   heroEyebrow: { color: '#E7FFF2', fontSize: 17, lineHeight: 24, fontWeight: '400' },
   heroTitle: { color: '#FFFFFF', fontSize: 21, lineHeight: 30, fontWeight: '800', marginTop: 4 },
+  heroArt: { width: 93, height: 88 },
   heroDots: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingLeft: 7 },
   heroDotLong: { width: 16, height: 3, borderRadius: 2, backgroundColor: '#165C3D' },
   heroDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
