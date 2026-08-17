@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Text } from '@/components/ui/Text';
 import { Colors } from '@/constants/theme';
 import { HistoryEntries } from '@/constants/mockData';
@@ -12,6 +13,37 @@ import { getCalendars } from '@/services/api';
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const YEARS = Array.from({ length: 21 }, (_, index) => 2020 + index);
 const MONTHS = Array.from({ length: 12 }, (_, index) => index);
+
+function WheelColumn({ values, value, onChange, suffix = '' }: {
+  values: number[];
+  value: number;
+  onChange: (value: number) => void;
+  suffix?: string;
+}) {
+  const itemHeight = 29;
+  return (
+    <View style={styles.wheelColumn}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        snapToInterval={itemHeight}
+        decelerationRate="fast"
+        contentContainerStyle={styles.wheelContent}
+        contentOffset={{ x: 0, y: Math.max(0, values.indexOf(value) * itemHeight) }}
+        onMomentumScrollEnd={(event) => {
+          const index = Math.round(event.nativeEvent.contentOffset.y / itemHeight);
+          onChange(values[Math.max(0, Math.min(index, values.length - 1))]);
+        }}>
+        {values.map((option) => (
+          <Pressable key={option} style={styles.wheelItem} onPress={() => onChange(option)}>
+            <Text style={[styles.wheelText, option === value && styles.wheelTextActive]}>
+              {option}{suffix}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
 
 function toDateKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -59,6 +91,15 @@ export default function HistoryScreen() {
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selected, setSelected] = useState<string | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const [itemPickerVisible, setItemPickerVisible] = useState(false);
+  const [pendingDate, setPendingDate] = useState({
+    year: today.getFullYear(),
+    month: today.getMonth() + 1,
+    day: today.getDate(),
+  });
+  const [itemType, setItemType] = useState('플라스틱 용기');
+  const [material, setMaterial] = useState('PET');
+  const [isClean, setIsClean] = useState(true);
   const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>(
     HistoryEntries.map((entry, index) => ({ ...entry, id: `mock-${index}`, isCompleted: true }))
   );
@@ -114,6 +155,38 @@ export default function HistoryScreen() {
       })()
     : '';
 
+  const openDatePicker = () => {
+    const base = selected ? new Date(`${selected}T00:00:00`) : new Date(cursor.year, cursor.month, today.getDate());
+    setPendingDate({ year: base.getFullYear(), month: base.getMonth() + 1, day: base.getDate() });
+    setPickerVisible(true);
+  };
+
+  const confirmDate = () => {
+    const maxDay = new Date(pendingDate.year, pendingDate.month, 0).getDate();
+    const day = Math.min(pendingDate.day, maxDay);
+    setCursor({ year: pendingDate.year, month: pendingDate.month - 1 });
+    setSelected(toDateKey(pendingDate.year, pendingDate.month - 1, day));
+    setPickerVisible(false);
+  };
+
+  const saveItem = () => {
+    const date = selected ?? todayKey;
+    const now = new Date();
+    setHistoryEntries((entries) => [
+      ...entries,
+      {
+        id: `local-${Date.now()}`,
+        date,
+        time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+        itemLabel: itemType,
+        method: `라벨, 뚜껑 분리 후 분리배출`,
+        isCompleted: true,
+      },
+    ]);
+    setSelected(date);
+    setItemPickerVisible(false);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <WebStatusBar />
@@ -128,65 +201,16 @@ export default function HistoryScreen() {
             <Ionicons name="list" size={22} color={selected ? Colors.primary : '#222222'} />
           </Pressable>
           <Ionicons name="search" size={22} color="#222222" />
-          <Pressable>
+          <Pressable onPress={() => setItemPickerVisible(true)}>
             <Ionicons name="add" size={25} color="#222222" />
           </Pressable>
         </View>
       </View>
 
-      <Pressable style={styles.monthRow} onPress={() => setPickerVisible((visible) => !visible)}>
+      <Pressable style={styles.monthRow} onPress={openDatePicker}>
         <Text style={styles.monthText}>{cursor.year}. {String(cursor.month + 1).padStart(2, '0')}</Text>
         <Ionicons name={pickerVisible ? 'caret-up' : 'caret-down'} size={12} color="#222222" />
       </Pressable>
-
-      {pickerVisible && (
-        <View style={styles.monthPicker}>
-          <View style={styles.pickerHeader}>
-            <View>
-              <Text style={styles.pickerTitle}>날짜 선택</Text>
-              <Text style={styles.pickerSubtitle}>연도와 월을 옆으로 넘겨 선택하세요.</Text>
-            </View>
-            <Pressable style={styles.pickerClose} onPress={() => setPickerVisible(false)}>
-              <Ionicons name="close" size={20} color="#555555" />
-            </Pressable>
-          </View>
-          <Text style={styles.pickerSectionLabel}>연도</Text>
-          <ScrollView
-            horizontal
-            contentContainerStyle={styles.horizontalOptions}
-            contentOffset={{ x: Math.max(0, YEARS.indexOf(cursor.year) * 71 - 105), y: 0 }}
-            showsHorizontalScrollIndicator={false}>
-            {YEARS.map((year) => {
-              const active = year === cursor.year;
-              return (
-                <Pressable key={year} style={[styles.dateChip, styles.yearChip, active && styles.dateChipActive]} onPress={() => setCursor((value) => ({ ...value, year }))}>
-                  <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>{year}</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <Text style={styles.pickerSectionLabel}>월</Text>
-          <ScrollView
-            horizontal
-            contentContainerStyle={styles.horizontalOptions}
-            contentOffset={{ x: Math.max(0, cursor.month * 57 - 105), y: 0 }}
-            showsHorizontalScrollIndicator={false}>
-            {MONTHS.map((month) => {
-              const active = month === cursor.month;
-              return (
-                <Pressable key={month} style={[styles.dateChip, active && styles.dateChipActive]} onPress={() => setCursor((value) => ({ ...value, month }))}>
-                  <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>{month + 1}월</Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          <View style={styles.pickerActions}>
-            <Pressable style={styles.pickerDoneButton} onPress={() => setPickerVisible(false)}>
-              <Text style={styles.pickerDoneText}>선택 완료</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
 
       <View style={styles.weekdayRow}>
         {WEEKDAYS.map((weekday, index) => (
@@ -249,6 +273,106 @@ export default function HistoryScreen() {
           </ScrollView>
         </>
       )}
+
+      <OverlayModal visible={pickerVisible} animationType="fade" onRequestClose={() => setPickerVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dateModalCard}>
+            <Text style={styles.modalTitle}>날짜 설정</Text>
+            <View style={styles.modalDivider} />
+            <View style={styles.wheelRow}>
+              <WheelColumn
+                values={YEARS}
+                value={pendingDate.year}
+                onChange={(year) => setPendingDate((date) => ({ ...date, year }))}
+                suffix="년"
+              />
+              <WheelColumn
+                values={MONTHS.map((month) => month + 1)}
+                value={pendingDate.month}
+                onChange={(month) => setPendingDate((date) => ({ ...date, month }))}
+                suffix="월"
+              />
+              <WheelColumn
+                values={Array.from({ length: new Date(pendingDate.year, pendingDate.month, 0).getDate() }, (_, index) => index + 1)}
+                value={Math.min(pendingDate.day, new Date(pendingDate.year, pendingDate.month, 0).getDate())}
+                onChange={(day) => setPendingDate((date) => ({ ...date, day }))}
+                suffix="일"
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelAction} onPress={() => setPickerVisible(false)}>
+                <Text style={styles.cancelActionText}>취소</Text>
+              </Pressable>
+              <Pressable style={styles.confirmAction} onPress={confirmDate}>
+                <Text style={styles.confirmActionText}>확인</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </OverlayModal>
+
+      <OverlayModal visible={itemPickerVisible} animationType="fade" onRequestClose={() => setItemPickerVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.itemModalCard}>
+            <Text style={styles.modalTitle}>품목 설정</Text>
+            <View style={styles.modalDivider} />
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingLabelWrap}>
+                <Ionicons name="water-outline" size={19} color="#17B66C" />
+                <Text style={styles.settingLabel}>종류</Text>
+              </View>
+              <Pressable style={styles.selectBox} onPress={() => setItemType((value) => value === '플라스틱 용기' ? '페트병' : '플라스틱 용기')}>
+                <Text style={styles.selectText}>{itemType}</Text>
+                <Ionicons name="chevron-down" size={16} color="#444444" />
+              </Pressable>
+            </View>
+            <View style={styles.settingRow}>
+              <View style={styles.settingLabelWrap}>
+                <Ionicons name="layers-outline" size={19} color="#17B66C" />
+                <Text style={styles.settingLabel}>재질</Text>
+              </View>
+              <Pressable style={styles.selectBox} onPress={() => setMaterial((value) => value === 'PET' ? 'PP' : 'PET')}>
+                <Text style={styles.selectText}>{material}</Text>
+                <Ionicons name="chevron-down" size={16} color="#444444" />
+              </Pressable>
+            </View>
+            <View style={styles.settingRow}>
+              <View style={styles.settingLabelWrap}>
+                <Ionicons name="water-outline" size={19} color="#17B66C" />
+                <Text style={styles.settingLabel}>오염 상태</Text>
+              </View>
+              <View style={styles.cleanToggle}>
+                <Pressable style={[styles.cleanOption, isClean && styles.cleanOptionActive]} onPress={() => setIsClean(true)}>
+                  <Text style={styles.cleanOptionText}>깨끗함</Text>
+                </Pressable>
+                <Pressable style={[styles.cleanOption, !isClean && styles.cleanOptionActive]} onPress={() => setIsClean(false)}>
+                  <Text style={styles.cleanOptionText}>오염됨</Text>
+                </Pressable>
+              </View>
+            </View>
+            <View style={styles.settingRow}>
+              <View style={styles.settingLabelWrap}>
+                <Ionicons name="recycle-outline" size={19} color="#17B66C" />
+                <Text style={styles.settingLabel}>구성품 분리</Text>
+              </View>
+              <View style={styles.componentValue}>
+                <Text style={styles.componentText}>라벨, 뚜껑 분리 필요</Text>
+                <Ionicons name="chevron-forward" size={19} color="#444444" />
+              </View>
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable style={styles.cancelAction} onPress={() => setItemPickerVisible(false)}>
+                <Text style={styles.cancelActionText}>취소</Text>
+              </Pressable>
+              <Pressable style={styles.confirmAction} onPress={saveItem}>
+                <Text style={styles.confirmActionText}>저장</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </OverlayModal>
     </SafeAreaView>
   );
 }
@@ -352,4 +476,56 @@ const styles = StyleSheet.create({
   entryAccent: { width: 2, height: 30, marginHorizontal: 10, backgroundColor: '#FF8A00' },
   entryMethod: { flex: 1, fontSize: 13, color: '#222222', fontWeight: '600' },
   emptyText: { paddingTop: 12, textAlign: 'center', color: Colors.textTertiary, fontSize: 13 },
+  modalBackdrop: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: 'rgba(0,0,0,0.34)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 38,
+  },
+  dateModalCard: { width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  itemModalCard: { width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  modalTitle: { height: 61, textAlign: 'center', textAlignVertical: 'center', paddingTop: 20, fontSize: 16, lineHeight: 21, fontWeight: '800', color: '#222222' },
+  modalDivider: { height: 1, backgroundColor: '#D9D9D9' },
+  wheelRow: { height: 164, flexDirection: 'row', paddingHorizontal: 10, alignItems: 'center' },
+  wheelColumn: { flex: 1, height: 116, overflow: 'hidden' },
+  wheelContent: { paddingVertical: 43 },
+  wheelItem: { height: 29, alignItems: 'center', justifyContent: 'center' },
+  wheelText: { color: '#C8C8C8', fontSize: 13, lineHeight: 18, fontWeight: '500' },
+  wheelTextActive: { color: '#222222', fontSize: 20, lineHeight: 25, fontWeight: '500' },
+  modalActions: { height: 56, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E1E1E1' },
+  cancelAction: { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  confirmAction: { flex: 1, backgroundColor: '#55CE87', alignItems: 'center', justifyContent: 'center' },
+  cancelActionText: { color: '#222222', fontSize: 16, fontWeight: '500' },
+  confirmActionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  settingRow: {
+    minHeight: 56,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E2E2',
+  },
+  settingLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  settingLabel: { color: '#222222', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  selectBox: {
+    width: 105,
+    height: 29,
+    paddingHorizontal: 9,
+    borderWidth: 1,
+    borderColor: '#CECECE',
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectText: { color: '#555555', fontSize: 10, fontWeight: '500' },
+  cleanToggle: { height: 29, flexDirection: 'row', borderWidth: 1, borderColor: '#CECECE', borderRadius: 4, overflow: 'hidden' },
+  cleanOption: { minWidth: 51, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  cleanOptionActive: { backgroundColor: '#DDF9E9', borderWidth: 1, borderColor: '#25A765' },
+  cleanOptionText: { color: '#222222', fontSize: 9, fontWeight: '600' },
+  componentValue: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  componentText: { color: '#222222', fontSize: 9, fontWeight: '500' },
 });
