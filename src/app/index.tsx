@@ -118,7 +118,11 @@ export default function OnboardingScreen() {
                 <View style={styles.notifyContent}>
                   <Text style={styles.notifyTime}>오후 9:41</Text>
                   <View style={styles.notifyMessageRow}>
-                    <Ionicons name="paper-plane" size={22} color="#087E4C" />
+                    <Image
+                      source={require('../../assets/images/onboarding-notification-icon.svg')}
+                      style={styles.notifyIcon}
+                      contentFit="contain"
+                    />
                     <Text style={styles.notifyText} numberOfLines={1}>
                       <Text style={styles.notifyName}>SSOK님,</Text> 오늘은 무엇을 버릴 예정인가요?
                     </Text>
@@ -229,11 +233,11 @@ const styles = StyleSheet.create({
   },
   previewFrameGroup: {
     width: '100%',
-    height: 430,
+    height: 414,
   },
   previewPhone: {
     alignSelf: 'center',
-    width: '65%',
+    width: '60%',
     aspectRatio: 199 / 404,
   },
   previewScreen: {
@@ -341,7 +345,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 25,
+    bottom: 29,
     minHeight: 82,
     flexDirection: 'row',
     alignItems: 'center',
@@ -361,6 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  notifyIcon: { width: 22, height: 23 },
   notifyTime: {
     color: 'rgba(255,255,255,0.92)',
     fontSize: 14,
