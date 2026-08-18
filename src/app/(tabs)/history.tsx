@@ -22,14 +22,25 @@ function WheelColumn({ values, value, onChange, suffix = '' }: {
 }) {
   const itemHeight = 29;
   const scrollRef = useRef<ScrollView>(null);
+  const lastSelectedValue = useRef(value);
 
   useEffect(() => {
+    if (lastSelectedValue.current === value) return;
+    lastSelectedValue.current = value;
     const index = Math.max(0, values.indexOf(value));
     const timer = setTimeout(() => {
       scrollRef.current?.scrollTo({ y: index * itemHeight, animated: false });
     }, 0);
     return () => clearTimeout(timer);
   }, [value, values]);
+
+  const selectAtOffset = (offsetY: number) => {
+    const index = Math.round(offsetY / itemHeight);
+    const nextValue = values[Math.max(0, Math.min(index, values.length - 1))];
+    if (nextValue === lastSelectedValue.current) return;
+    lastSelectedValue.current = nextValue;
+    onChange(nextValue);
+  };
 
   return (
     <View style={styles.wheelColumn}>
@@ -38,14 +49,20 @@ function WheelColumn({ values, value, onChange, suffix = '' }: {
         showsVerticalScrollIndicator={false}
         snapToInterval={itemHeight}
         decelerationRate="fast"
+        scrollEventThrottle={16}
         contentContainerStyle={styles.wheelContent}
         contentOffset={{ x: 0, y: Math.max(0, values.indexOf(value) * itemHeight) }}
-        onMomentumScrollEnd={(event) => {
-          const index = Math.round(event.nativeEvent.contentOffset.y / itemHeight);
-          onChange(values[Math.max(0, Math.min(index, values.length - 1))]);
-        }}>
+        onScroll={(event) => selectAtOffset(event.nativeEvent.contentOffset.y)}
+        onMomentumScrollEnd={(event) => selectAtOffset(event.nativeEvent.contentOffset.y)}>
         {values.map((option) => (
-          <Pressable key={option} style={styles.wheelItem} onPress={() => onChange(option)}>
+          <Pressable
+            key={option}
+            style={styles.wheelItem}
+            onPress={() => {
+              lastSelectedValue.current = option;
+              scrollRef.current?.scrollTo({ y: values.indexOf(option) * itemHeight, animated: true });
+              onChange(option);
+            }}>
             <Text style={[styles.wheelText, option === value && styles.wheelTextActive]}>
               {option}{suffix}
             </Text>
