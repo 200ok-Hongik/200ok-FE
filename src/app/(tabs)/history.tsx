@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   },
   dateModalCard: { width: 292, maxWidth: '100%', borderRadius: 15, backgroundColor: '#FFFFFF', overflow: 'hidden' },
   itemModalCard: { width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
-  modalTitle: { height: 61, textAlign: 'center', textAlignVertical: 'center', paddingTop: 20, fontSize: 16, lineHeight: 21, fontWeight: '800', color: '#222222' },
+  modalTitle: { height: 61, textAlign: 'center', textAlignVertical: 'center', paddingTop: 21, fontSize: 13, lineHeight: 18, fontWeight: '700', color: '#222222' },
   modalDivider: { height: 1, backgroundColor: '#D9D9D9' },
   wheelRow: { height: 220, flexDirection: 'row', paddingHorizontal: 46, alignItems: 'center', position: 'relative' },
   wheelColumn: { flex: 1, height: 174, overflow: 'hidden' },
