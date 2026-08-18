@@ -508,8 +508,8 @@ const styles = StyleSheet.create({
   wheelColumn: { flex: 1, height: 174, overflow: 'hidden' },
   wheelContent: { paddingVertical: 72 },
   wheelItem: { height: 29, alignItems: 'center', justifyContent: 'center' },
-  wheelText: { color: '#C9C9C9', fontSize: 13, lineHeight: 18, fontWeight: '300' },
-  wheelTextActive: { color: '#4A4A4A', fontSize: 21, lineHeight: 26, fontWeight: '400' },
+  wheelText: { color: '#C9C9C9', fontSize: 11, lineHeight: 16, fontWeight: '300' },
+  wheelTextActive: { color: '#4A4A4A', fontSize: 18, lineHeight: 23, fontWeight: '400' },
   wheelSelectionGuide: {
     position: 'absolute',
     left: 25,
