@@ -23,6 +23,7 @@ function WheelColumn({ values, value, onChange, suffix = '' }: {
   const itemHeight = 29;
   const scrollRef = useRef<ScrollView>(null);
   const lastSelectedValue = useRef(value);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (lastSelectedValue.current === value) return;
@@ -34,9 +35,16 @@ function WheelColumn({ values, value, onChange, suffix = '' }: {
     return () => clearTimeout(timer);
   }, [value, values]);
 
-  const selectAtOffset = (offsetY: number) => {
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
+
+  const selectAtOffset = (offsetY: number, snap = false) => {
     const index = Math.round(offsetY / itemHeight);
     const nextValue = values[Math.max(0, Math.min(index, values.length - 1))];
+    if (snap && Math.abs(offsetY - index * itemHeight) > 0.5) {
+      scrollRef.current?.scrollTo({ y: index * itemHeight, animated: true });
+    }
     if (nextValue === lastSelectedValue.current) return;
     lastSelectedValue.current = nextValue;
     onChange(nextValue);
@@ -52,8 +60,12 @@ function WheelColumn({ values, value, onChange, suffix = '' }: {
         scrollEventThrottle={16}
         contentContainerStyle={styles.wheelContent}
         contentOffset={{ x: 0, y: Math.max(0, values.indexOf(value) * itemHeight) }}
-        onScroll={(event) => selectAtOffset(event.nativeEvent.contentOffset.y)}
-        onMomentumScrollEnd={(event) => selectAtOffset(event.nativeEvent.contentOffset.y)}>
+        onScroll={(event) => {
+          const offsetY = event.nativeEvent.contentOffset.y;
+          if (settleTimer.current) clearTimeout(settleTimer.current);
+          settleTimer.current = setTimeout(() => selectAtOffset(offsetY, true), 80);
+        }}
+        onMomentumScrollEnd={(event) => selectAtOffset(event.nativeEvent.contentOffset.y, true)}>
         {values.map((option) => (
           <Pressable
             key={option}
