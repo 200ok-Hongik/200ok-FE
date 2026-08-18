@@ -155,9 +155,10 @@ export default function HistoryScreen() {
     month: today.getMonth() + 1,
     day: today.getDate(),
   });
-  const [itemType, setItemType] = useState<ItemType>('플라스틱류');
+  const [itemType, setItemType] = useState<ItemType | null>(null);
   const [material, setMaterial] = useState('모르겠어요');
   const [openDropdown, setOpenDropdown] = useState<'type' | 'material' | null>(null);
+  const [typeError, setTypeError] = useState(false);
   const [isClean, setIsClean] = useState(true);
   const [separationStatus, setSeparationStatus] = useState<'완료' | '안 함' | '해당 없음'>('해당 없음');
   const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>(
@@ -230,6 +231,11 @@ export default function HistoryScreen() {
   };
 
   const saveItem = () => {
+    if (!itemType) {
+      setTypeError(true);
+      setOpenDropdown(null);
+      return;
+    }
     const date = selected ?? todayKey;
     const now = new Date();
     setHistoryEntries((entries) => [
@@ -262,7 +268,7 @@ export default function HistoryScreen() {
             <Ionicons name="list" size={22} color={selected ? Colors.primary : '#222222'} />
           </Pressable>
           <Ionicons name="search" size={22} color="#222222" />
-          <Pressable onPress={() => { setOpenDropdown(null); setItemPickerVisible(true); }}>
+          <Pressable onPress={() => { setItemType(null); setMaterial('모르겠어요'); setTypeError(false); setOpenDropdown(null); setItemPickerVisible(true); }}>
             <Ionicons name="add" size={25} color="#222222" />
           </Pressable>
         </View>
@@ -373,10 +379,15 @@ export default function HistoryScreen() {
         </View>
       </OverlayModal>
 
-      <OverlayModal visible={itemPickerVisible} animationType="fade" onRequestClose={() => { setOpenDropdown(null); setItemPickerVisible(false); }}>
+      <OverlayModal visible={itemPickerVisible} animationType="fade" onRequestClose={() => { setTypeError(false); setOpenDropdown(null); setItemPickerVisible(false); }}>
         <View style={[styles.modalBackdrop, styles.itemModalBackdrop]}>
           <View style={styles.itemModalCard}>
-            <Text style={styles.itemModalTitle}>품목 설정</Text>
+            <View style={styles.itemModalHeader}>
+              <Text style={styles.itemModalTitle}>품목 설정</Text>
+              <Text style={[styles.requiredHint, typeError && styles.requiredHintError]}>
+                {typeError ? '종류를 선택해주세요.' : '* 필수 선택 항목'}
+              </Text>
+            </View>
             <View style={styles.modalDivider} />
 
             <View style={[styles.settingRow, styles.typeSettingRow]}>
@@ -385,14 +396,14 @@ export default function HistoryScreen() {
                 <Text style={styles.settingLabel}>종류 <Text style={styles.requiredMark}>*</Text></Text>
               </View>
               <View style={styles.selectWrap}>
-                <Pressable style={[styles.selectBox, openDropdown === 'type' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'type' ? null : 'type')}>
-                  <Text numberOfLines={1} style={styles.selectText}>{itemType}</Text>
+                <Pressable style={[styles.selectBox, openDropdown === 'type' && styles.selectBoxOpen, typeError && styles.selectBoxError]} onPress={() => setOpenDropdown((value) => value === 'type' ? null : 'type')}>
+                  <Text numberOfLines={1} style={[styles.selectText, !itemType && styles.selectPlaceholder]}>{itemType ?? '선택해주세요'}</Text>
                   <Ionicons name={openDropdown === 'type' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
                 </Pressable>
                 {openDropdown === 'type' && (
                   <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                     {HISTORY_ITEM_TYPES.map((option) => (
-                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setMaterial('모르겠어요'); setOpenDropdown(null); }}>
+                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setMaterial('모르겠어요'); setTypeError(false); setOpenDropdown(null); }}>
                         <Text style={[styles.dropdownOptionText, option === itemType && styles.dropdownOptionTextActive]}>{option}</Text>
                       </Pressable>
                     ))}
@@ -406,13 +417,13 @@ export default function HistoryScreen() {
                 <Text style={styles.settingLabel}>{itemType === '일반쓰레기' ? '세부 유형' : '재질'}</Text>
               </View>
               <View style={styles.selectWrap}>
-                <Pressable style={[styles.selectBox, openDropdown === 'material' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'material' ? null : 'material')}>
-                  <Text numberOfLines={1} style={styles.selectText}>{material}</Text>
+                <Pressable disabled={!itemType} style={[styles.selectBox, !itemType && styles.selectBoxDisabled, openDropdown === 'material' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'material' ? null : 'material')}>
+                  <Text numberOfLines={1} style={[styles.selectText, !itemType && styles.selectDisabledText]}>{itemType ? material : '종류를 먼저 선택해주세요'}</Text>
                   <Ionicons name={openDropdown === 'material' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
                 </Pressable>
                 {openDropdown === 'material' && (
                   <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                    {['모르겠어요', ...MATERIAL_OPTIONS[itemType]].map((option) => (
+                    {(itemType ? ['모르겠어요', ...MATERIAL_OPTIONS[itemType]] : []).map((option) => (
                       <Pressable key={option} style={[styles.dropdownOption, option === material && styles.dropdownOptionActive]} onPress={() => { setMaterial(option); setOpenDropdown(null); }}>
                         <Text style={[styles.dropdownOptionText, option === material && styles.dropdownOptionTextActive]}>{option}</Text>
                       </Pressable>
@@ -453,7 +464,7 @@ export default function HistoryScreen() {
             </View>
 
             <View style={[styles.modalActions, styles.itemModalActions]}>
-              <Pressable style={styles.cancelAction} onPress={() => { setOpenDropdown(null); setItemPickerVisible(false); }}>
+              <Pressable style={styles.cancelAction} onPress={() => { setTypeError(false); setOpenDropdown(null); setItemPickerVisible(false); }}>
                 <Text style={styles.cancelActionText}>취소</Text>
               </Pressable>
               <Pressable style={styles.confirmAction} onPress={saveItem}>
@@ -578,7 +589,10 @@ const styles = StyleSheet.create({
   itemModalCard: { width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
   itemModalBackdrop: { paddingHorizontal: 10 },
   modalTitle: { height: 61, textAlign: 'center', textAlignVertical: 'center', paddingTop: 21, fontSize: 15, lineHeight: 20, fontWeight: '700', color: '#222222' },
-  itemModalTitle: { height: 76, textAlign: 'center', textAlignVertical: 'center', paddingTop: 27, fontSize: 20, lineHeight: 26, fontWeight: '700', color: '#111111' },
+  itemModalHeader: { height: 76, alignItems: 'center', justifyContent: 'center' },
+  itemModalTitle: { textAlign: 'center', fontSize: 20, lineHeight: 26, fontWeight: '700', color: '#111111' },
+  requiredHint: { marginTop: 3, color: '#22A162', fontSize: 10, lineHeight: 14, fontWeight: '500' },
+  requiredHintError: { color: '#E5484D' },
   modalDivider: { height: 1, backgroundColor: '#D9D9D9' },
   wheelRow: { height: 220, flexDirection: 'row', paddingHorizontal: 46, alignItems: 'center', position: 'relative' },
   wheelColumn: { flex: 1, height: 174, overflow: 'hidden' },
@@ -630,7 +644,11 @@ const styles = StyleSheet.create({
   },
   selectWrap: { width: 170, position: 'relative' },
   selectBoxOpen: { borderColor: '#22A162' },
+  selectBoxError: { borderColor: '#E5484D', borderWidth: 1.5 },
+  selectBoxDisabled: { backgroundColor: '#F5F5F5', borderColor: '#E1E1E1' },
   selectText: { flex: 1, marginRight: 6, color: '#555555', fontSize: 13, fontWeight: '500' },
+  selectPlaceholder: { color: '#9CA3AF' },
+  selectDisabledText: { color: '#A9A9A9', fontSize: 11 },
   dropdownMenu: {
     position: 'absolute',
     top: 37,
