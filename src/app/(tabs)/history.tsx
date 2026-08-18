@@ -22,7 +22,7 @@ function WheelColumn({ values, value, onChange, suffix = '' }: {
 }) {
   const itemHeight = 29;
   const scrollRef = useRef<ScrollView>(null);
-  const lastSelectedValue = useRef(value);
+  const lastSelectedValue = useRef<number | null>(null);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
