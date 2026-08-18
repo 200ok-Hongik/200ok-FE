@@ -156,9 +156,10 @@ export default function HistoryScreen() {
     day: today.getDate(),
   });
   const [itemType, setItemType] = useState<ItemType>('플라스틱류');
-  const [material, setMaterial] = useState('PET');
+  const [material, setMaterial] = useState('모르겠어요');
   const [openDropdown, setOpenDropdown] = useState<'type' | 'material' | null>(null);
   const [isClean, setIsClean] = useState(true);
+  const [separationStatus, setSeparationStatus] = useState<'완료' | '안 함' | '해당 없음'>('해당 없음');
   const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>(
     HistoryEntries.map((entry, index) => ({ ...entry, id: `mock-${index}`, isCompleted: true }))
   );
@@ -238,7 +239,7 @@ export default function HistoryScreen() {
         date,
         time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
         itemLabel: itemType,
-        method: `라벨, 뚜껑 분리 후 분리배출`,
+        method: `${itemType} · ${material} · 구성품 ${separationStatus}`,
         isCompleted: true,
       },
     ]);
@@ -381,7 +382,7 @@ export default function HistoryScreen() {
             <View style={[styles.settingRow, styles.typeSettingRow]}>
               <View style={styles.settingLabelWrap}>
                 <Image source={require('../../../assets/images/item-type.svg')} style={styles.settingIcon} resizeMode="contain" />
-                <Text style={styles.settingLabel}>종류</Text>
+                <Text style={styles.settingLabel}>종류 <Text style={styles.requiredMark}>*</Text></Text>
               </View>
               <View style={styles.selectWrap}>
                 <Pressable style={[styles.selectBox, openDropdown === 'type' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'type' ? null : 'type')}>
@@ -391,7 +392,7 @@ export default function HistoryScreen() {
                 {openDropdown === 'type' && (
                   <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                     {HISTORY_ITEM_TYPES.map((option) => (
-                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setMaterial(MATERIAL_OPTIONS[option][0]); setOpenDropdown(null); }}>
+                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setMaterial('모르겠어요'); setOpenDropdown(null); }}>
                         <Text style={[styles.dropdownOptionText, option === itemType && styles.dropdownOptionTextActive]}>{option}</Text>
                       </Pressable>
                     ))}
@@ -411,7 +412,7 @@ export default function HistoryScreen() {
                 </Pressable>
                 {openDropdown === 'material' && (
                   <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                    {MATERIAL_OPTIONS[itemType].map((option) => (
+                    {['모르겠어요', ...MATERIAL_OPTIONS[itemType]].map((option) => (
                       <Pressable key={option} style={[styles.dropdownOption, option === material && styles.dropdownOptionActive]} onPress={() => { setMaterial(option); setOpenDropdown(null); }}>
                         <Text style={[styles.dropdownOptionText, option === material && styles.dropdownOptionTextActive]}>{option}</Text>
                       </Pressable>
@@ -439,9 +440,15 @@ export default function HistoryScreen() {
                 <Image source={require('../../../assets/images/item-separation.svg')} style={styles.settingIcon} resizeMode="contain" />
                 <Text style={styles.settingLabel}>구성품 분리</Text>
               </View>
-              <View style={styles.componentValue}>
-                <Text style={styles.componentText}>라벨, 뚜껑 분리 필요</Text>
-                <Ionicons name="chevron-forward" size={19} color="#444444" />
+              <View style={styles.separationToggle}>
+                {(['완료', '안 함', '해당 없음'] as const).map((option) => (
+                  <Pressable
+                    key={option}
+                    style={[styles.separationOption, separationStatus === option && styles.cleanOptionActive]}
+                    onPress={() => setSeparationStatus(option)}>
+                    <Text style={styles.separationOptionText}>{option}</Text>
+                  </Pressable>
+                ))}
               </View>
             </View>
 
@@ -609,6 +616,7 @@ const styles = StyleSheet.create({
   materialSettingRow: { zIndex: 3 },
   settingIcon: { width: 20, height: 22 },
   settingLabel: { color: '#222222', fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  requiredMark: { color: '#22A162', fontWeight: '700' },
   selectBox: {
     width: 170,
     height: 34,
@@ -644,6 +652,7 @@ const styles = StyleSheet.create({
   cleanOption: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   cleanOptionActive: { backgroundColor: '#DDF9E9', borderWidth: 1, borderColor: '#25A765' },
   cleanOptionText: { color: '#222222', fontSize: 12, fontWeight: '600' },
-  componentValue: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  componentText: { color: '#222222', fontSize: 12, fontWeight: '500' },
+  separationToggle: { width: 170, height: 34, flexDirection: 'row', borderWidth: 1, borderColor: '#CECECE', borderRadius: 4, overflow: 'hidden' },
+  separationOption: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  separationOptionText: { color: '#222222', fontSize: 10, fontWeight: '600' },
 });
