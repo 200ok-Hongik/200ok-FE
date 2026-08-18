@@ -385,7 +385,7 @@ export default function HistoryScreen() {
               </View>
               <View style={styles.selectWrap}>
                 <Pressable style={[styles.selectBox, openDropdown === 'type' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'type' ? null : 'type')}>
-                  <Text style={styles.selectText}>{itemType}</Text>
+                  <Text numberOfLines={1} style={styles.selectText}>{itemType}</Text>
                   <Ionicons name={openDropdown === 'type' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
                 </Pressable>
                 {openDropdown === 'type' && (
@@ -406,7 +406,7 @@ export default function HistoryScreen() {
               </View>
               <View style={styles.selectWrap}>
                 <Pressable style={[styles.selectBox, openDropdown === 'material' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'material' ? null : 'material')}>
-                  <Text style={styles.selectText}>{material}</Text>
+                  <Text numberOfLines={1} style={styles.selectText}>{material}</Text>
                   <Ionicons name={openDropdown === 'material' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
                 </Pressable>
                 {openDropdown === 'material' && (
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
   settingIcon: { width: 20, height: 22 },
   settingLabel: { color: '#222222', fontSize: 15, lineHeight: 20, fontWeight: '700' },
   selectBox: {
-    width: 126,
+    width: 170,
     height: 34,
     paddingHorizontal: 10,
     borderWidth: 1,
@@ -620,9 +620,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  selectWrap: { width: 126, position: 'relative' },
+  selectWrap: { width: 170, position: 'relative' },
   selectBoxOpen: { borderColor: '#22A162' },
-  selectText: { color: '#555555', fontSize: 13, fontWeight: '500' },
+  selectText: { flex: 1, marginRight: 6, color: '#555555', fontSize: 13, fontWeight: '500' },
   dropdownMenu: {
     position: 'absolute',
     top: 37,
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
   },
   dropdownOption: { height: 34, paddingHorizontal: 10, justifyContent: 'center', backgroundColor: '#FFFFFF' },
   dropdownOptionActive: { backgroundColor: '#E4F8ED' },
-  dropdownOptionText: { color: '#555555', fontSize: 13, fontWeight: '500' },
+  dropdownOptionText: { color: '#555555', fontSize: 13, lineHeight: 18, fontWeight: '500' },
   dropdownOptionTextActive: { color: '#168A52', fontWeight: '700' },
   cleanToggle: { width: 126, height: 34, flexDirection: 'row', borderWidth: 1, borderColor: '#CECECE', borderRadius: 4, overflow: 'hidden' },
   cleanOption: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
