@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OverlayModal } from '@/components/ui/OverlayModal';
@@ -116,11 +116,14 @@ function TrashDay({ count }: { count: number }) {
   const used = count > 0;
   return (
     <View style={styles.trashWrap}>
-      <View style={[styles.trashLid, used ? styles.trashLidOpen : styles.trashLidClosed]} />
-      <View style={[styles.trashHandle, used && styles.trashActive]} />
-      <View style={[styles.trashBody, used && styles.trashActive]}>
-        {used && <Text style={styles.trashCount}>{count}</Text>}
-      </View>
+      <Image
+        source={used
+          ? require('../../../assets/images/trash-open.svg')
+          : require('../../../assets/images/trash-closed.svg')}
+        style={used ? styles.trashOpenImage : styles.trashClosedImage}
+        resizeMode="contain"
+      />
+      {used && <Text style={styles.trashCount}>{count}</Text>}
     </View>
   );
 }
@@ -496,13 +499,9 @@ const styles = StyleSheet.create({
   calendarGrid: { height: 354, paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-start' },
   dayCell: { width: `${100 / 7}%`, height: 59, alignItems: 'center', justifyContent: 'flex-start' },
   trashWrap: { width: 34, height: 39, position: 'relative', alignItems: 'center', justifyContent: 'flex-end' },
-  trashBody: { width: 23, height: 27, borderRadius: 2, backgroundColor: '#BDC2C0', alignItems: 'center', justifyContent: 'center' },
-  trashHandle: { position: 'absolute', top: 2, width: 10, height: 3, borderRadius: 1, backgroundColor: '#BDC2C0' },
-  trashLid: { position: 'absolute', top: 6, width: 31, height: 4, borderRadius: 1, backgroundColor: '#BDC2C0' },
-  trashLidClosed: {},
-  trashLidOpen: { top: 3, transform: [{ rotate: '8deg' }] },
-  trashActive: { backgroundColor: '#2BD489' },
-  trashCount: { color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  trashClosedImage: { width: 33, height: 31 },
+  trashOpenImage: { width: 33, height: 36 },
+  trashCount: { position: 'absolute', left: 0, right: 0, bottom: 5, textAlign: 'center', color: '#FFFFFF', fontSize: 12, lineHeight: 16, fontWeight: '700' },
   dayNumber: { minWidth: 18, textAlign: 'center', color: '#333333', fontSize: 11, lineHeight: 17 },
   todayDay: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#111111', alignItems: 'center', justifyContent: 'center' },
   selectedDayText: { color: '#16A34A', fontWeight: '800' },
