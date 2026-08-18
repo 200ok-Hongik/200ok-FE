@@ -142,6 +142,7 @@ export default function HistoryScreen() {
   });
   const [itemType, setItemType] = useState('플라스틱 용기');
   const [material, setMaterial] = useState('PET');
+  const [openDropdown, setOpenDropdown] = useState<'type' | 'material' | null>(null);
   const [isClean, setIsClean] = useState(true);
   const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>(
     HistoryEntries.map((entry, index) => ({ ...entry, id: `mock-${index}`, isCompleted: true }))
@@ -227,6 +228,7 @@ export default function HistoryScreen() {
       },
     ]);
     setSelected(date);
+    setOpenDropdown(null);
     setItemPickerVisible(false);
   };
 
@@ -244,7 +246,7 @@ export default function HistoryScreen() {
             <Ionicons name="list" size={22} color={selected ? Colors.primary : '#222222'} />
           </Pressable>
           <Ionicons name="search" size={22} color="#222222" />
-          <Pressable onPress={() => setItemPickerVisible(true)}>
+          <Pressable onPress={() => { setOpenDropdown(null); setItemPickerVisible(true); }}>
             <Ionicons name="add" size={25} color="#222222" />
           </Pressable>
         </View>
@@ -355,31 +357,53 @@ export default function HistoryScreen() {
         </View>
       </OverlayModal>
 
-      <OverlayModal visible={itemPickerVisible} animationType="fade" onRequestClose={() => setItemPickerVisible(false)}>
+      <OverlayModal visible={itemPickerVisible} animationType="fade" onRequestClose={() => { setOpenDropdown(null); setItemPickerVisible(false); }}>
         <View style={[styles.modalBackdrop, styles.itemModalBackdrop]}>
           <View style={styles.itemModalCard}>
             <Text style={styles.itemModalTitle}>품목 설정</Text>
             <View style={styles.modalDivider} />
 
-            <View style={styles.settingRow}>
+            <View style={[styles.settingRow, styles.typeSettingRow]}>
               <View style={styles.settingLabelWrap}>
                 <Image source={require('../../../assets/images/item-type.svg')} style={styles.settingIcon} resizeMode="contain" />
                 <Text style={styles.settingLabel}>종류</Text>
               </View>
-              <Pressable style={styles.selectBox} onPress={() => setItemType((value) => value === '플라스틱 용기' ? '페트병' : '플라스틱 용기')}>
-                <Text style={styles.selectText}>{itemType}</Text>
-                <Ionicons name="chevron-down" size={16} color="#444444" />
-              </Pressable>
+              <View style={styles.selectWrap}>
+                <Pressable style={[styles.selectBox, openDropdown === 'type' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'type' ? null : 'type')}>
+                  <Text style={styles.selectText}>{itemType}</Text>
+                  <Ionicons name={openDropdown === 'type' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
+                </Pressable>
+                {openDropdown === 'type' && (
+                  <View style={styles.dropdownMenu}>
+                    {['플라스틱 용기', '페트병'].map((option) => (
+                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setOpenDropdown(null); }}>
+                        <Text style={[styles.dropdownOptionText, option === itemType && styles.dropdownOptionTextActive]}>{option}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
-            <View style={styles.settingRow}>
+            <View style={[styles.settingRow, styles.materialSettingRow]}>
               <View style={styles.settingLabelWrap}>
                 <Image source={require('../../../assets/images/item-material.svg')} style={styles.settingIcon} resizeMode="contain" />
                 <Text style={styles.settingLabel}>재질</Text>
               </View>
-              <Pressable style={styles.selectBox} onPress={() => setMaterial((value) => value === 'PET' ? 'PP' : 'PET')}>
-                <Text style={styles.selectText}>{material}</Text>
-                <Ionicons name="chevron-down" size={16} color="#444444" />
-              </Pressable>
+              <View style={styles.selectWrap}>
+                <Pressable style={[styles.selectBox, openDropdown === 'material' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'material' ? null : 'material')}>
+                  <Text style={styles.selectText}>{material}</Text>
+                  <Ionicons name={openDropdown === 'material' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
+                </Pressable>
+                {openDropdown === 'material' && (
+                  <View style={styles.dropdownMenu}>
+                    {['PET', 'PP'].map((option) => (
+                      <Pressable key={option} style={[styles.dropdownOption, option === material && styles.dropdownOptionActive]} onPress={() => { setMaterial(option); setOpenDropdown(null); }}>
+                        <Text style={[styles.dropdownOptionText, option === material && styles.dropdownOptionTextActive]}>{option}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
             </View>
             <View style={styles.settingRow}>
               <View style={styles.settingLabelWrap}>
@@ -407,7 +431,7 @@ export default function HistoryScreen() {
             </View>
 
             <View style={[styles.modalActions, styles.itemModalActions]}>
-              <Pressable style={styles.cancelAction} onPress={() => setItemPickerVisible(false)}>
+              <Pressable style={styles.cancelAction} onPress={() => { setOpenDropdown(null); setItemPickerVisible(false); }}>
                 <Text style={styles.cancelActionText}>취소</Text>
               </Pressable>
               <Pressable style={styles.confirmAction} onPress={saveItem}>
@@ -566,6 +590,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E2E2E2',
   },
   settingLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  typeSettingRow: { zIndex: 4 },
+  materialSettingRow: { zIndex: 3 },
   settingIcon: { width: 20, height: 22 },
   settingLabel: { color: '#222222', fontSize: 15, lineHeight: 20, fontWeight: '700' },
   selectBox: {
@@ -579,7 +605,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  selectWrap: { width: 126, position: 'relative' },
+  selectBoxOpen: { borderColor: '#22A162' },
   selectText: { color: '#555555', fontSize: 13, fontWeight: '500' },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 37,
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderColor: '#CECECE',
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    zIndex: 10,
+  },
+  dropdownOption: { height: 34, paddingHorizontal: 10, justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  dropdownOptionActive: { backgroundColor: '#E4F8ED' },
+  dropdownOptionText: { color: '#555555', fontSize: 13, fontWeight: '500' },
+  dropdownOptionTextActive: { color: '#168A52', fontWeight: '700' },
   cleanToggle: { width: 126, height: 34, flexDirection: 'row', borderWidth: 1, borderColor: '#CECECE', borderRadius: 4, overflow: 'hidden' },
   cleanOption: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   cleanOptionActive: { backgroundColor: '#DDF9E9', borderWidth: 1, borderColor: '#25A765' },
