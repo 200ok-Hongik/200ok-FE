@@ -309,6 +309,7 @@ export default function HistoryScreen() {
                 onChange={(day) => setPendingDate((date) => ({ ...date, day }))}
                 suffix="일"
               />
+              <View pointerEvents="none" style={styles.wheelSelectionGuide} />
             </View>
             <View style={styles.modalActions}>
               <Pressable style={styles.cancelAction} onPress={() => setPickerVisible(false)}>
@@ -499,16 +500,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 38,
   },
-  dateModalCard: { width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  dateModalCard: { width: 292, maxWidth: '100%', borderRadius: 15, backgroundColor: '#FFFFFF', overflow: 'hidden' },
   itemModalCard: { width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
   modalTitle: { height: 61, textAlign: 'center', textAlignVertical: 'center', paddingTop: 20, fontSize: 16, lineHeight: 21, fontWeight: '800', color: '#222222' },
   modalDivider: { height: 1, backgroundColor: '#D9D9D9' },
-  wheelRow: { height: 164, flexDirection: 'row', paddingHorizontal: 10, alignItems: 'center' },
-  wheelColumn: { flex: 1, height: 116, overflow: 'hidden' },
-  wheelContent: { paddingVertical: 43 },
+  wheelRow: { height: 220, flexDirection: 'row', paddingHorizontal: 10, alignItems: 'center', position: 'relative' },
+  wheelColumn: { flex: 1, height: 174, overflow: 'hidden' },
+  wheelContent: { paddingVertical: 72 },
   wheelItem: { height: 29, alignItems: 'center', justifyContent: 'center' },
   wheelText: { color: '#C8C8C8', fontSize: 13, lineHeight: 18, fontWeight: '500' },
-  wheelTextActive: { color: '#222222', fontSize: 20, lineHeight: 25, fontWeight: '500' },
+  wheelTextActive: { color: '#2A2A2A', fontSize: 21, lineHeight: 26, fontWeight: '500' },
+  wheelSelectionGuide: {
+    position: 'absolute',
+    left: 10,
+    right: 10,
+    top: 95,
+    height: 30,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E1E1E1',
+  },
   modalActions: { height: 56, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E1E1E1' },
   cancelAction: { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   confirmAction: { flex: 1, backgroundColor: '#55CE87', alignItems: 'center', justifyContent: 'center' },
