@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,9 +21,20 @@ function WheelColumn({ values, value, onChange, suffix = '' }: {
   suffix?: string;
 }) {
   const itemHeight = 29;
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const index = Math.max(0, values.indexOf(value));
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: index * itemHeight, animated: false });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [value, values]);
+
   return (
     <View style={styles.wheelColumn}>
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         snapToInterval={itemHeight}
         decelerationRate="fast"
@@ -477,8 +488,12 @@ const styles = StyleSheet.create({
   entryMethod: { flex: 1, fontSize: 13, color: '#222222', fontWeight: '600' },
   emptyText: { paddingTop: 12, textAlign: 'center', color: Colors.textTertiary, fontSize: 13 },
   modalBackdrop: {
-    flex: 1,
-    width: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
     backgroundColor: 'rgba(0,0,0,0.34)',
     alignItems: 'center',
     justifyContent: 'center',
