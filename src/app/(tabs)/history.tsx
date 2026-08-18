@@ -14,6 +14,21 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const YEARS = Array.from({ length: 21 }, (_, index) => 2020 + index);
 const MONTHS = Array.from({ length: 12 }, (_, index) => index);
 
+const MATERIAL_OPTIONS = {
+  '무색 페트병': ['PET'],
+  '플라스틱류': ['PET', 'HDPE', 'LDPE', 'PP', 'PS', 'OTHER'],
+  '캔류': ['알루미늄', '철'],
+  '유리병류': ['투명 유리', '갈색 유리', '녹색 유리', '기타'],
+  '비닐류': ['LDPE', 'HDPE', 'PP', 'OTHER'],
+  '종이류': ['일반 종이', '종이상자', '신문지', '책자·노트'],
+  '종이팩': ['일반팩(살균팩)', '멸균팩'],
+  '스티로폼류': ['포장용 스티로폼', '완충재', '식품 용기'],
+  '일반쓰레기': ['재활용 불가 플라스틱', '오염된 종이·비닐', '복합재질', '기타'],
+} as const;
+
+type ItemType = keyof typeof MATERIAL_OPTIONS;
+const HISTORY_ITEM_TYPES = Object.keys(MATERIAL_OPTIONS) as ItemType[];
+
 function WheelColumn({ values, value, onChange, suffix = '' }: {
   values: number[];
   value: number;
@@ -140,7 +155,7 @@ export default function HistoryScreen() {
     month: today.getMonth() + 1,
     day: today.getDate(),
   });
-  const [itemType, setItemType] = useState('플라스틱 용기');
+  const [itemType, setItemType] = useState<ItemType>('플라스틱류');
   const [material, setMaterial] = useState('PET');
   const [openDropdown, setOpenDropdown] = useState<'type' | 'material' | null>(null);
   const [isClean, setIsClean] = useState(true);
@@ -374,20 +389,20 @@ export default function HistoryScreen() {
                   <Ionicons name={openDropdown === 'type' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
                 </Pressable>
                 {openDropdown === 'type' && (
-                  <View style={styles.dropdownMenu}>
-                    {['플라스틱 용기', '페트병'].map((option) => (
-                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setOpenDropdown(null); }}>
+                  <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    {HISTORY_ITEM_TYPES.map((option) => (
+                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setMaterial(MATERIAL_OPTIONS[option][0]); setOpenDropdown(null); }}>
                         <Text style={[styles.dropdownOptionText, option === itemType && styles.dropdownOptionTextActive]}>{option}</Text>
                       </Pressable>
                     ))}
-                  </View>
+                  </ScrollView>
                 )}
               </View>
             </View>
             <View style={[styles.settingRow, styles.materialSettingRow]}>
               <View style={styles.settingLabelWrap}>
                 <Image source={require('../../../assets/images/item-material.svg')} style={styles.settingIcon} resizeMode="contain" />
-                <Text style={styles.settingLabel}>재질</Text>
+                <Text style={styles.settingLabel}>{itemType === '일반쓰레기' ? '세부 유형' : '재질'}</Text>
               </View>
               <View style={styles.selectWrap}>
                 <Pressable style={[styles.selectBox, openDropdown === 'material' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'material' ? null : 'material')}>
@@ -395,13 +410,13 @@ export default function HistoryScreen() {
                   <Ionicons name={openDropdown === 'material' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
                 </Pressable>
                 {openDropdown === 'material' && (
-                  <View style={styles.dropdownMenu}>
-                    {['PET', 'PP'].map((option) => (
+                  <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
+                    {MATERIAL_OPTIONS[itemType].map((option) => (
                       <Pressable key={option} style={[styles.dropdownOption, option === material && styles.dropdownOptionActive]} onPress={() => { setMaterial(option); setOpenDropdown(null); }}>
                         <Text style={[styles.dropdownOptionText, option === material && styles.dropdownOptionTextActive]}>{option}</Text>
                       </Pressable>
                     ))}
-                  </View>
+                  </ScrollView>
                 )}
               </View>
             </View>
@@ -619,6 +634,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
     zIndex: 10,
+    maxHeight: 170,
   },
   dropdownOption: { height: 34, paddingHorizontal: 10, justifyContent: 'center', backgroundColor: '#FFFFFF' },
   dropdownOptionActive: { backgroundColor: '#E4F8ED' },
