@@ -356,14 +356,14 @@ export default function HistoryScreen() {
       </OverlayModal>
 
       <OverlayModal visible={itemPickerVisible} animationType="fade" onRequestClose={() => setItemPickerVisible(false)}>
-        <View style={styles.modalBackdrop}>
+        <View style={[styles.modalBackdrop, styles.itemModalBackdrop]}>
           <View style={styles.itemModalCard}>
-            <Text style={styles.modalTitle}>품목 설정</Text>
+            <Text style={styles.itemModalTitle}>품목 설정</Text>
             <View style={styles.modalDivider} />
 
             <View style={styles.settingRow}>
               <View style={styles.settingLabelWrap}>
-                <Ionicons name="water-outline" size={19} color="#17B66C" />
+                <Image source={require('../../../assets/images/item-type.svg')} style={styles.settingIcon} resizeMode="contain" />
                 <Text style={styles.settingLabel}>종류</Text>
               </View>
               <Pressable style={styles.selectBox} onPress={() => setItemType((value) => value === '플라스틱 용기' ? '페트병' : '플라스틱 용기')}>
@@ -373,7 +373,7 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.settingRow}>
               <View style={styles.settingLabelWrap}>
-                <Ionicons name="layers-outline" size={19} color="#17B66C" />
+                <Image source={require('../../../assets/images/item-material.svg')} style={styles.settingIcon} resizeMode="contain" />
                 <Text style={styles.settingLabel}>재질</Text>
               </View>
               <Pressable style={styles.selectBox} onPress={() => setMaterial((value) => value === 'PET' ? 'PP' : 'PET')}>
@@ -383,7 +383,7 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.settingRow}>
               <View style={styles.settingLabelWrap}>
-                <Ionicons name="water-outline" size={19} color="#17B66C" />
+                <Image source={require('../../../assets/images/item-contamination.svg')} style={styles.settingIcon} resizeMode="contain" />
                 <Text style={styles.settingLabel}>오염 상태</Text>
               </View>
               <View style={styles.cleanToggle}>
@@ -397,7 +397,7 @@ export default function HistoryScreen() {
             </View>
             <View style={styles.settingRow}>
               <View style={styles.settingLabelWrap}>
-                <Ionicons name="recycle-outline" size={19} color="#17B66C" />
+                <Image source={require('../../../assets/images/item-separation.svg')} style={styles.settingIcon} resizeMode="contain" />
                 <Text style={styles.settingLabel}>구성품 분리</Text>
               </View>
               <View style={styles.componentValue}>
@@ -406,7 +406,7 @@ export default function HistoryScreen() {
               </View>
             </View>
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, styles.itemModalActions]}>
               <Pressable style={styles.cancelAction} onPress={() => setItemPickerVisible(false)}>
                 <Text style={styles.cancelActionText}>취소</Text>
               </Pressable>
@@ -530,7 +530,9 @@ const styles = StyleSheet.create({
   },
   dateModalCard: { width: 292, maxWidth: '100%', borderRadius: 15, backgroundColor: '#FFFFFF', overflow: 'hidden' },
   itemModalCard: { width: '100%', borderRadius: 16, backgroundColor: '#FFFFFF', overflow: 'hidden' },
+  itemModalBackdrop: { paddingHorizontal: 10 },
   modalTitle: { height: 61, textAlign: 'center', textAlignVertical: 'center', paddingTop: 21, fontSize: 15, lineHeight: 20, fontWeight: '700', color: '#222222' },
+  itemModalTitle: { height: 76, textAlign: 'center', textAlignVertical: 'center', paddingTop: 27, fontSize: 20, lineHeight: 26, fontWeight: '700', color: '#111111' },
   modalDivider: { height: 1, backgroundColor: '#D9D9D9' },
   wheelRow: { height: 220, flexDirection: 'row', paddingHorizontal: 46, alignItems: 'center', position: 'relative' },
   wheelColumn: { flex: 1, height: 174, overflow: 'hidden' },
@@ -549,25 +551,27 @@ const styles = StyleSheet.create({
     borderColor: '#E7E7E7',
   },
   modalActions: { height: 56, flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#E1E1E1' },
+  itemModalActions: { height: 66 },
   cancelAction: { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   confirmAction: { flex: 1, backgroundColor: '#55CE87', alignItems: 'center', justifyContent: 'center' },
   cancelActionText: { color: '#3F3F3F', fontSize: 16, fontWeight: '400' },
   confirmActionText: { color: '#FFFFFF', fontSize: 16, fontWeight: '500' },
   settingRow: {
-    minHeight: 56,
-    paddingHorizontal: 14,
+    height: 66,
+    paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E2E2',
   },
-  settingLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  settingLabel: { color: '#222222', fontSize: 12, lineHeight: 17, fontWeight: '700' },
+  settingLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingIcon: { width: 20, height: 22 },
+  settingLabel: { color: '#222222', fontSize: 15, lineHeight: 20, fontWeight: '700' },
   selectBox: {
-    width: 105,
-    height: 29,
-    paddingHorizontal: 9,
+    width: 126,
+    height: 34,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: '#CECECE',
     borderRadius: 4,
@@ -575,11 +579,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  selectText: { color: '#555555', fontSize: 10, fontWeight: '500' },
-  cleanToggle: { height: 29, flexDirection: 'row', borderWidth: 1, borderColor: '#CECECE', borderRadius: 4, overflow: 'hidden' },
-  cleanOption: { minWidth: 51, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  selectText: { color: '#555555', fontSize: 13, fontWeight: '500' },
+  cleanToggle: { width: 126, height: 34, flexDirection: 'row', borderWidth: 1, borderColor: '#CECECE', borderRadius: 4, overflow: 'hidden' },
+  cleanOption: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   cleanOptionActive: { backgroundColor: '#DDF9E9', borderWidth: 1, borderColor: '#25A765' },
-  cleanOptionText: { color: '#222222', fontSize: 9, fontWeight: '600' },
+  cleanOptionText: { color: '#222222', fontSize: 12, fontWeight: '600' },
   componentValue: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  componentText: { color: '#222222', fontSize: 9, fontWeight: '500' },
+  componentText: { color: '#222222', fontSize: 12, fontWeight: '500' },
 });
