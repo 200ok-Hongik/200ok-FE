@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  searchInput: { flex: 1, height: '100%', color: '#20332B', fontSize: 12, padding: 0 },
+  searchInput: { flex: 1, height: '100%', color: '#20332B', fontSize: 12, fontFamily: 'PretendardRegular', padding: 0 },
   heroRow: {
     minHeight: 130,
     flexDirection: 'row',

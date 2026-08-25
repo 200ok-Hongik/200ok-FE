@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -9,6 +10,20 @@ import { WEB_FRAME_ID } from '@/components/ui/OverlayModal';
 const isWeb = Platform.OS === 'web';
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    PretendardThin: require('../../assets/fonts/Pretendard-Thin.otf'),
+    PretendardExtraLight: require('../../assets/fonts/Pretendard-ExtraLight.otf'),
+    PretendardLight: require('../../assets/fonts/Pretendard-Light.otf'),
+    PretendardRegular: require('../../assets/fonts/Pretendard-Regular.otf'),
+    PretendardMedium: require('../../assets/fonts/Pretendard-Medium.otf'),
+    PretendardSemiBold: require('../../assets/fonts/Pretendard-SemiBold.otf'),
+    PretendardBold: require('../../assets/fonts/Pretendard-Bold.otf'),
+    PretendardExtraBold: require('../../assets/fonts/Pretendard-ExtraBold.otf'),
+    PretendardBlack: require('../../assets/fonts/Pretendard-Black.otf'),
+  });
+
+  if (!fontsLoaded && !fontError) return null;
+
   const stack = (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
