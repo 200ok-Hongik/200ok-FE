@@ -78,6 +78,23 @@ export type DisposalGuide = {
   finalGuideMessage: string;
 };
 
+type ScanDetailApiResponse = {
+  scanResultId: number;
+  imageUrl: string;
+  aiCategory: CategoryInfo;
+  aiStates: ChecklistItem[];
+  confirmedResult: ScanDetail['userResult'];
+  createdAt: string;
+};
+
+type ScanResultConfirmApiResponse = Omit<ScanResultConfirmResponse, 'scanId'> & {
+  scanResultId: number;
+};
+
+type DisposalGuideApiResponse = Omit<DisposalGuide, 'scanId'> & {
+  scanResultId: number;
+};
+
 export type Region = {
   regionId: number;
   regionCode: string;
@@ -175,33 +192,43 @@ export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
   // Content-Type is intentionally omitted: fetch/RN must generate it itself
   // (including the multipart boundary) from the FormData body. Setting it
   // manually here breaks the boundary and the request fails outright.
-  return request<ScanUploadResult>(withUserId('/api/scans'), {
+  return request<ScanUploadResult>('/api/scans', {
     method: 'POST',
     body: formData,
   });
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
-  return request<ScanDetail>(withUserId(`/api/scans/${scanId}`));
+  const result = await request<ScanDetailApiResponse>(`/api/scans/${scanId}`);
+  return {
+    scanId: result.scanResultId,
+    imageUrl: result.imageUrl,
+    category: result.aiCategory,
+    states: result.aiStates,
+    userResult: result.confirmedResult,
+    createdAt: result.createdAt,
+  };
 }
 
 export async function confirmScanResult(
   scanId: number,
   body: ScanResultConfirmRequest
 ): Promise<ScanResultConfirmResponse> {
-  return request<ScanResultConfirmResponse>(withUserId(`/api/scans/${scanId}/result`), {
+  const result = await request<ScanResultConfirmApiResponse>(`/api/scans/${scanId}/result`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  return { ...result, scanId: result.scanResultId };
 }
 
 export async function getDisposalGuide(scanId: number): Promise<DisposalGuide> {
-  return request<DisposalGuide>(withUserId(`/api/scans/${scanId}/disposal-guide`));
+  const result = await request<DisposalGuideApiResponse>(`/api/scans/${scanId}/disposal-guide`);
+  return { ...result, scanId: result.scanResultId };
 }
 
 export async function submitScanFeedback(scanId: number, comment: string): Promise<void> {
-  await request<void>(withUserId(`/api/scans/${scanId}/feedback`), {
+  await request<void>(`/api/scans/${scanId}/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ comment }),
