@@ -25,6 +25,7 @@ export default function ScanCameraScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const requestedRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
 
@@ -63,20 +64,35 @@ export default function ScanCameraScreen() {
 
     try {
       setCaptureError(null);
+      setUploadStatus('사진을 촬영하고 있어요…');
       setIsUploading(true);
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.75, base64: Platform.OS === 'web' });
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.5,
+        base64: Platform.OS === 'web',
+        imageType: Platform.OS === 'web' ? 'jpg' : undefined,
+        scale: Platform.OS === 'web' ? 0.5 : undefined,
+      });
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
 
+      await cameraRef.current.pausePreview();
+      setUploadStatus('사진을 분석하고 있어요…');
       const result = await uploadScan(photo.uri);
       const resultScanId = result.scanResultId ?? (result as { scanId?: number }).scanId;
       if (!resultScanId) throw new Error('백엔드가 스캔 ID를 반환하지 않았어요.');
       router.push({ pathname: '/scan/captured', params: { scanId: String(resultScanId) } });
     } catch (error) {
       console.error(error);
-      const message = '사진을 전송하지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.';
+      await cameraRef.current?.resumePreview().catch(() => undefined);
+      const detail = error instanceof Error ? error.message : '';
+      const message = detail.includes('502') || detail.includes('503') || detail.includes('504')
+        ? 'AI 분석 서버가 응답하지 않아요. 잠시 후 다시 시도해주세요.'
+        : detail.includes('시간이 초과')
+          ? detail
+          : '사진을 전송하지 못했어요. 로그인 상태와 네트워크를 확인해주세요.';
       setCaptureError(message);
       Alert.alert('업로드 실패', message);
     } finally {
+      setUploadStatus(null);
       setIsUploading(false);
     }
   };
@@ -151,6 +167,7 @@ export default function ScanCameraScreen() {
             {phase === 'scanning' ? '재활용품을 인식하고 있어요...' : '화면을 반듯하게 유지해주세요'}
           </Text>
           {captureError && <Text style={styles.captureError}>{captureError}</Text>}
+          {uploadStatus && <Text style={styles.uploadStatus}>{uploadStatus}</Text>}
         </View>
 
         <View style={styles.bottomArea}>
@@ -279,6 +296,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(127,29,29,0.78)',
     color: '#FFFFFF',
     fontSize: FontSize.xs,
+    textAlign: 'center',
+  },
+  uploadStatus: {
+    marginTop: Spacing.sm,
+    color: '#FFFFFF',
+    fontSize: FontSize.sm,
+    fontWeight: '700',
     textAlign: 'center',
   },
   bottomArea: { alignItems: 'center', paddingBottom: Spacing.sm },

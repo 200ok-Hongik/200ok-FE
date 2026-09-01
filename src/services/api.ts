@@ -175,6 +175,8 @@ function withUserId(path: string, params: Record<string, string> = {}) {
 
 export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
   const formData = new FormData();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
 
   if (typeof window !== 'undefined') {
     const dataUri = imageUri.startsWith('data:') ? imageUri : `data:image/jpeg;base64,${imageUri}`;
@@ -192,10 +194,20 @@ export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
   // Content-Type is intentionally omitted: fetch/RN must generate it itself
   // (including the multipart boundary) from the FormData body. Setting it
   // manually here breaks the boundary and the request fails outright.
-  return request<ScanUploadResult>('/api/scans', {
-    method: 'POST',
-    body: formData,
-  });
+  try {
+    return await request<ScanUploadResult>('/api/scans', {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('AI 분석 시간이 초과됐어요. 잠시 후 다시 시도해주세요.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
