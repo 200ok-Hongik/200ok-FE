@@ -268,7 +268,6 @@ const styles = StyleSheet.create({
     color: '#12A85F',
     fontSize: 25,
     lineHeight: 28,
-    fontFamily: 'Arial',
     fontWeight: '700',
     letterSpacing: -0.8,
   },
