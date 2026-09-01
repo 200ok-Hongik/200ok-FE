@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Image as RNImage, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,6 +18,17 @@ const TAB_ICONS = [
   { name: 'person-outline' as const, label: 'My', route: '/(tabs)/mypage' as const },
 ];
 
+const AI_MODEL_URL = 'https://two00ok-ai.onrender.com/analyze';
+
+async function warmUpAiModel() {
+  if (Platform.OS !== 'web') return;
+  const asset = RNImage.resolveAssetSource(require('../../../assets/images/image1.png'));
+  const image = await fetch(asset.uri).then((response) => response.blob());
+  const body = new FormData();
+  body.append('image', image, 'warmup.png');
+  await fetch(AI_MODEL_URL, { method: 'POST', body, mode: 'no-cors' });
+}
+
 export default function ScanCameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [phase, setPhase] = useState<'scanning' | 'recognized'>('scanning');
@@ -26,6 +37,7 @@ export default function ScanCameraScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [isAiReady, setIsAiReady] = useState(Platform.OS !== 'web');
   const requestedRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
 
@@ -46,11 +58,23 @@ export default function ScanCameraScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    warmUpAiModel()
+      .catch((error) => console.warn('AI 모델 준비 요청에 실패했습니다.', error))
+      .finally(() => !cancelled && setIsAiReady(true));
+    return () => { cancelled = true; };
+  }, []);
+
   const active = MockDetections[Math.min(activeIndex, MockDetections.length - 1)];
   const cameraGranted = permission?.granted;
 
   const handleCapture = async () => {
     if (isUploading) return;
+    if (!isAiReady) {
+      setCaptureError('AI 분석 서버를 준비하고 있어요. 잠시만 기다려주세요.');
+      return;
+    }
     if (!cameraGranted) {
       const message = '설정에서 카메라 접근을 허용해주세요.';
       setCaptureError(message);
@@ -164,7 +188,7 @@ export default function ScanCameraScreen() {
           </View>
 
           <Text style={styles.hint}>
-            {phase === 'scanning' ? '재활용품을 인식하고 있어요...' : '화면을 반듯하게 유지해주세요'}
+            {!isAiReady ? 'AI 분석 서버를 준비하고 있어요...' : phase === 'scanning' ? '재활용품을 인식하고 있어요...' : '화면을 반듯하게 유지해주세요'}
           </Text>
           {captureError && <Text style={styles.captureError}>{captureError}</Text>}
           {uploadStatus && <Text style={styles.uploadStatus}>{uploadStatus}</Text>}
@@ -172,7 +196,7 @@ export default function ScanCameraScreen() {
 
         <View style={styles.bottomArea}>
           <Pressable
-            style={[styles.shutter, (!isCameraReady || isUploading) && styles.shutterDisabled]}
+            style={[styles.shutter, (!isCameraReady || !isAiReady || isUploading) && styles.shutterDisabled]}
             onPress={handleCapture}
             disabled={isUploading}>
             {isUploading ? <ActivityIndicator color={Colors.scanDark} /> : <View style={styles.shutterInner} />}
