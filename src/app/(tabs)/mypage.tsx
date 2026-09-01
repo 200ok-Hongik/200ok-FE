@@ -55,17 +55,6 @@ export default function MyPageScreen() {
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.topRow}>
             <Text style={styles.logo}>SSOK</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="로그아웃"
-              disabled={isLoggingOut}
-              onPress={handleLogout}
-              style={({ pressed }) => [styles.topLogout, pressed && styles.pressed]}>
-              <Ionicons name="log-out-outline" size={18} color={Colors.textSecondary} />
-              <Text style={styles.topLogoutLabel}>
-                {isLoggingOut ? '로그아웃 중' : '로그아웃'}
-              </Text>
-            </Pressable>
           </View>
 
           <View style={styles.profileRow}>
@@ -143,16 +132,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   logo: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.primary },
-  topLogout: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: Radius.sm,
-    backgroundColor: 'rgba(255,255,255,0.72)',
-  },
-  topLogoutLabel: { fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecondary },
   pressed: { opacity: 0.6 },
   profileRow: {
     flexDirection: 'row',
