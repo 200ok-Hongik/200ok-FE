@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react';
 import { StyleSheet, Text as RNText, type TextProps, type TextStyle } from 'react-native';
 
 const FONT_FAMILY_BY_WEIGHT = {
@@ -12,6 +13,8 @@ const FONT_FAMILY_BY_WEIGHT = {
   '900': 'PretendardBlack',
 } as const;
 
+const PretendardFontContext = createContext<string>(FONT_FAMILY_BY_WEIGHT['400']);
+
 function getPretendardFamily(fontWeight: TextStyle['fontWeight']) {
   if (fontWeight === 'bold') return FONT_FAMILY_BY_WEIGHT['700'];
   if (!fontWeight || fontWeight === 'normal') return FONT_FAMILY_BY_WEIGHT['400'];
@@ -22,12 +25,19 @@ function getPretendardFamily(fontWeight: TextStyle['fontWeight']) {
 }
 
 export function Text({ style, ...props }: TextProps) {
+  const inheritedFontFamily = useContext(PretendardFontContext);
   const flattenedStyle = StyleSheet.flatten(style);
+  const explicitFontFamily = flattenedStyle?.fontFamily;
+  const hasExplicitFontWeight = flattenedStyle?.fontWeight != null;
+  const fontFamily = explicitFontFamily
+    ?? (hasExplicitFontWeight ? getPretendardFamily(flattenedStyle?.fontWeight) : inheritedFontFamily);
 
-  if (flattenedStyle?.fontFamily) {
-    return <RNText {...props} style={style} />;
-  }
-
-  const fontFamily = getPretendardFamily(flattenedStyle?.fontWeight);
-  return <RNText {...props} style={[style, { fontFamily, fontWeight: 'normal' }]} />;
+  return (
+    <PretendardFontContext.Provider value={fontFamily}>
+      <RNText
+        {...props}
+        style={explicitFontFamily ? style : [style, { fontFamily, fontWeight: 'normal' }]}
+      />
+    </PretendardFontContext.Provider>
+  );
 }
