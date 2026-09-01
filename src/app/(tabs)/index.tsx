@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/Card';
 import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { FrequentItems } from '@/constants/mockData';
-import { getHomeSummary, getProfile, submitScanFeedback, type HomeSummary, type UserProfile } from '@/services/api';
+import { getCalendars, getHomeSummary, getProfile, submitScanFeedback, type HomeSummary, type UserProfile } from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -61,8 +61,10 @@ export default function HomeScreen() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [monthlyRecycleCount, setMonthlyRecycleCount] = useState(0);
   const today = new Date();
   const weekday = WEEKDAYS[today.getDay()];
+  const currentMonth = today.getMonth() + 1;
 
   const handleFeedback = async (isAccurate: boolean) => {
     if (!scanId || isSubmittingFeedback) {
@@ -90,11 +92,17 @@ export default function HomeScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getHomeSummary(), getProfile()])
-      .then(([summary, userProfile]) => {
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`;
+
+    Promise.all([getHomeSummary(), getProfile(), getCalendars(startDate, endDate)])
+      .then(([summary, userProfile, calendars]) => {
         if (!cancelled) {
           setHomeSummary(summary);
           setProfile(userProfile);
+          setMonthlyRecycleCount(calendars.filter((item) => item.isCompleted).length);
         }
       })
       .catch((error) => console.warn('홈 API를 불러오지 못했습니다.', error));
@@ -150,11 +158,15 @@ export default function HomeScreen() {
 
         <View style={styles.statBadge}>
           <View style={styles.statBadgeInfo}>
-            <Ionicons name="trash" size={17} color="#FFFFFF" />
-            <Text style={styles.statBadgeLabel}>7월 누적 재활용</Text>
+            <Image
+              source={require('../../../assets/images/monthly-recycle-icon.png')}
+              style={styles.statBadgeIcon}
+              contentFit="contain"
+            />
+            <Text style={styles.statBadgeLabel}>{currentMonth}월 누적 재활용</Text>
           </View>
           <View style={styles.statBadgeCountPill}>
-            <Text style={styles.statBadgeCount}>+ 12</Text>
+            <Text style={styles.statBadgeCount}>+ {monthlyRecycleCount}</Text>
           </View>
         </View>
 
@@ -304,6 +316,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF8908',
   },
   statBadgeInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statBadgeIcon: { width: 21, height: 21 },
   statBadgeLabel: { color: '#FFFFFF', fontSize: 12, lineHeight: 15, fontWeight: '600', letterSpacing: -0.3 },
   statBadgeCountPill: {
     width: 62,
