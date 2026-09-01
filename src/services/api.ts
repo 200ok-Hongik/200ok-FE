@@ -191,8 +191,6 @@ function withUserId(path: string, params: Record<string, string> = {}) {
 
 export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
   const formData = new FormData();
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000);
 
   if (typeof window !== 'undefined') {
     const dataUri = imageUri.startsWith('data:') ? imageUri : `data:image/jpeg;base64,${imageUri}`;
@@ -210,20 +208,35 @@ export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
   // Content-Type is intentionally omitted: fetch/RN must generate it itself
   // (including the multipart boundary) from the FormData body. Setting it
   // manually here breaks the boundary and the request fails outright.
-  try {
-    return await request<ScanUploadResult>('/api/scans', {
-      method: 'POST',
-      body: formData,
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('AI 분석 시간이 초과됐어요. 잠시 후 다시 시도해주세요.');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    try {
+      return await request<ScanUploadResult>('/api/scans', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      const retryable = error instanceof Error && (
+        error.name === 'AbortError' || /\b(502|503|504)\b/.test(message)
+      );
+      if (attempt === 0 && retryable) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        continue;
+      }
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('AI 서버가 응답하지 않아요. 잠시 후 다시 시도해주세요.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
     }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
   }
+
+  throw new Error('AI 분석 요청을 완료하지 못했어요.');
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
