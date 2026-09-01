@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -23,6 +23,8 @@ export default function ScanCameraScreen() {
   const [phase, setPhase] = useState<'scanning' | 'recognized'>('scanning');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
   const requestedRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
 
@@ -48,21 +50,32 @@ export default function ScanCameraScreen() {
 
   const handleCapture = async () => {
     if (isUploading) return;
-    if (!cameraGranted || !cameraRef.current) {
-      Alert.alert('카메라 권한이 필요해요', '설정에서 카메라 접근을 허용해주세요.');
+    if (!cameraGranted) {
+      const message = '설정에서 카메라 접근을 허용해주세요.';
+      setCaptureError(message);
+      Alert.alert('카메라 권한이 필요해요', message);
+      return;
+    }
+    if (!isCameraReady || !cameraRef.current) {
+      setCaptureError('카메라를 준비하고 있어요. 잠시 후 다시 눌러주세요.');
       return;
     }
 
     try {
+      setCaptureError(null);
       setIsUploading(true);
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.6 });
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.75, base64: Platform.OS === 'web' });
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
 
       const result = await uploadScan(photo.uri);
-      router.push({ pathname: '/scan/captured', params: { scanId: String(result.scanResultId) } });
+      const resultScanId = result.scanResultId ?? (result as { scanId?: number }).scanId;
+      if (!resultScanId) throw new Error('백엔드가 스캔 ID를 반환하지 않았어요.');
+      router.push({ pathname: '/scan/captured', params: { scanId: String(resultScanId) } });
     } catch (error) {
       console.error(error);
-      Alert.alert('업로드 실패', '이미지를 분석하는 중 문제가 발생했어요. 다시 시도해주세요.');
+      const message = '사진을 전송하지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.';
+      setCaptureError(message);
+      Alert.alert('업로드 실패', message);
     } finally {
       setIsUploading(false);
     }
@@ -71,7 +84,17 @@ export default function ScanCameraScreen() {
   return (
     <View style={styles.container}>
       {cameraGranted ? (
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          mode="picture"
+          onCameraReady={() => setIsCameraReady(true)}
+          onMountError={(event) => {
+            setIsCameraReady(false);
+            setCaptureError(event.message || '카메라를 시작하지 못했어요.');
+          }}
+        />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.permissionFallback]}>
           <Ionicons name="camera-outline" size={40} color="rgba(255,255,255,0.6)" />
@@ -127,10 +150,14 @@ export default function ScanCameraScreen() {
           <Text style={styles.hint}>
             {phase === 'scanning' ? '재활용품을 인식하고 있어요...' : '화면을 반듯하게 유지해주세요'}
           </Text>
+          {captureError && <Text style={styles.captureError}>{captureError}</Text>}
         </View>
 
         <View style={styles.bottomArea}>
-          <Pressable style={styles.shutter} onPress={handleCapture} disabled={isUploading}>
+          <Pressable
+            style={[styles.shutter, (!isCameraReady || isUploading) && styles.shutterDisabled]}
+            onPress={handleCapture}
+            disabled={isUploading}>
             {isUploading ? <ActivityIndicator color={Colors.scanDark} /> : <View style={styles.shutterInner} />}
           </Pressable>
 
@@ -244,6 +271,16 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     marginTop: Spacing.md,
   },
+  captureError: {
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(127,29,29,0.78)',
+    color: '#FFFFFF',
+    fontSize: FontSize.xs,
+    textAlign: 'center',
+  },
   bottomArea: { alignItems: 'center', paddingBottom: Spacing.sm },
   shutter: {
     width: 70,
@@ -256,6 +293,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   shutterInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF' },
+  shutterDisabled: { opacity: 0.55 },
   tabRow: {
     flexDirection: 'row',
     width: '100%',

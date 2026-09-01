@@ -158,11 +158,19 @@ function withUserId(path: string, params: Record<string, string> = {}) {
 
 export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
   const formData = new FormData();
-  formData.append('image', {
-    uri: imageUri,
-    name: 'scan.jpg',
-    type: 'image/jpeg',
-  } as unknown as Blob);
+
+  if (typeof window !== 'undefined') {
+    const dataUri = imageUri.startsWith('data:') ? imageUri : `data:image/jpeg;base64,${imageUri}`;
+    const imageResponse = await fetch(dataUri);
+    const imageBlob = await imageResponse.blob();
+    formData.append('image', imageBlob, 'scan.jpg');
+  } else {
+    formData.append('image', {
+      uri: imageUri,
+      name: 'scan.jpg',
+      type: 'image/jpeg',
+    } as unknown as Blob);
+  }
 
   // Content-Type is intentionally omitted: fetch/RN must generate it itself
   // (including the multipart boundary) from the FormData body. Setting it
