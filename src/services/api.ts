@@ -145,11 +145,27 @@ export type UserProfile = {
 
 async function request<T>(path: string, init?: RequestInit, canRetry = true): Promise<T> {
   const headers = new Headers(init?.headers);
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: 'include',
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers,
+      credentials: 'include',
+    });
+  } catch (error) {
+    // Spring Security redirects an expired session to Kakao instead of
+    // returning 401. On web that cross-origin redirect surfaces as a CORS
+    // network error, so refresh once before reporting a request failure.
+    if (canRetry && path !== '/api/auth/refresh') {
+      const refreshed = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      }).catch(() => null);
+      if (refreshed?.ok) return request<T>(path, init, false);
+    }
+    throw error;
+  }
 
   if (response.status === 401 && canRetry && path !== '/api/auth/refresh') {
     const refreshed = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
