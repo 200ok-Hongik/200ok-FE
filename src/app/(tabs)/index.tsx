@@ -61,7 +61,6 @@ export default function HomeScreen() {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const hasUnreadNotifications = (homeSummary?.recentNotifications.length ?? 0) > 0;
   const today = new Date();
   const weekday = WEEKDAYS[today.getDay()];
 
@@ -109,11 +108,11 @@ export default function HomeScreen() {
       <WebStatusBar />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.logo}>SSOK</Text>
-          <View style={styles.notificationWrap}>
-            <Ionicons name="notifications" size={24} color="#16864E" />
-            {hasUnreadNotifications && <View style={styles.notificationDot} />}
-          </View>
+          <Image
+            source={require('../../../assets/images/home-header.png')}
+            style={styles.headerAsset}
+            contentFit="contain"
+          />
         </View>
 
         <Text style={styles.heading}>
@@ -258,34 +257,10 @@ const styles = StyleSheet.create({
   webStatusIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   scroll: { paddingHorizontal: 16, paddingBottom: 18 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingTop: 14,
     paddingBottom: 10,
   },
-  logo: {
-    color: '#12A85F',
-    fontSize: 25,
-    lineHeight: 28,
-    fontWeight: '700',
-    letterSpacing: -0.8,
-  },
-  notificationWrap: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationDot: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#FF6B6B',
-  },
+  headerAsset: { width: '100%', height: 24 },
   heading: { marginTop: 14, fontSize: 26, lineHeight: 33, fontWeight: '800', color: Colors.text, letterSpacing: -0.8 },
   headingAccent: { color: Colors.primaryDark },
   subheading: {
