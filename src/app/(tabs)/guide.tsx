@@ -106,9 +106,13 @@ export default function GuideScreen() {
               <Text style={styles.bannerTitle}>AI로 SCAN하고{`\n`}쉽게 분리배출을 기록하자!</Text>
               <View style={styles.tagRow}>
                 {['#간편함', '#편리함', '#J형인간'].map((tag) => (
-                  <View key={tag} style={styles.tag}>
+                  <Pressable
+                    key={tag}
+                    accessibilityRole="text"
+                    style={styles.tag}
+                    onPress={(event) => event.stopPropagation()}>
                     <Text style={styles.tagText}>{tag}</Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             </View>
