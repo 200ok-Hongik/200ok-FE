@@ -13,6 +13,12 @@ export type CategoryInfo = {
   source: string;
 };
 
+export type TrashCategory = {
+  categoryId: number;
+  code: string;
+  name: string;
+};
+
 export type ChecklistItem = {
   checklistId: number;
   checkItemName: string;
@@ -266,6 +272,10 @@ export async function confirmScanResult(
 export async function getDisposalGuide(scanId: number): Promise<DisposalGuide> {
   const result = await request<DisposalGuideApiResponse>(`/api/scans/${scanId}/disposal-guide`);
   return { ...result, scanId: result.scanResultId };
+}
+
+export async function getTrashCategories(): Promise<TrashCategory[]> {
+  return request<TrashCategory[]>('/api/trash-categories');
 }
 
 export async function submitScanFeedback(scanId: number, comment: string): Promise<void> {
