@@ -1,12 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import { Text } from '@/components/ui/Text';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { Text } from '@/components/ui/Text';
 import { FrequentItems } from '@/constants/mockData';
 import { getProfile, logout, type UserProfile } from '@/services/api';
 
@@ -17,185 +14,128 @@ export default function MyPageScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    getProfile()
-      .then((data) => {
-        if (!cancelled) setProfile(data);
-      })
+    getProfile().then((data) => !cancelled && setProfile(data))
       .catch((error) => console.warn('프로필을 불러오지 못했습니다.', error));
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-
-    try {
-      await logout();
-    } catch (error) {
-      console.warn('로그아웃 API 호출에 실패했습니다.', error);
-    } finally {
-      if (Platform.OS === 'web') {
-        window.location.replace('/');
-      } else {
-        router.dismissAll();
-        router.replace('/');
-      }
+    try { await logout(); } catch (error) { console.warn('로그아웃 API 호출에 실패했습니다.', error); }
+    finally {
+      if (Platform.OS === 'web') window.location.replace('/');
+      else { router.dismissAll(); router.replace('/'); }
     }
   };
 
-  const regionLabel = profile?.region
+  const region = profile?.region
     ? `${profile.region.sido} ${profile.region.gugun} ${profile.region.dong}`
     : '지역을 설정해 주세요';
 
   return (
-    <LinearGradient colors={[Colors.mint, Colors.background]} style={styles.flex}>
-      <SafeAreaView style={styles.flex} edges={['top']}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <View style={styles.topRow}>
-            <Text style={styles.logo}>SSOK</Text>
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+        <View style={s.header}>
+          <View style={s.logoCrop}>
+            <Image source={require('../../../assets/images/home-header.png')} style={s.logo} />
           </View>
-
-          <View style={styles.profileRow}>
-            <Text style={styles.profileText}>
-              {profile?.name ?? '사용자'} 님,{'\n'}오늘도 SSOK과 함께해요!
-            </Text>
-            <View style={styles.avatarWrap}>
-              <View style={styles.avatar}>
-                <Ionicons name="person" size={28} color={Colors.primaryDark} />
-              </View>
-              <View style={styles.avatarEdit}>
-                <Ionicons name="pencil" size={11} color="#FFFFFF" />
-              </View>
-            </View>
-          </View>
-
-          <Pressable style={styles.regionCard} onPress={() => router.push('/setting')}>
-            <Text style={styles.regionText}>지역 | {regionLabel}</Text>
-            <Text style={styles.regionLink}>변경하기  ›</Text>
+          <Pressable hitSlop={12} onPress={() => router.push('/setting')}>
+            <Ionicons name="settings-outline" size={24} color="#202020" />
           </Pressable>
+        </View>
 
-          <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
-          <View style={styles.frequentRow}>
-            {FrequentItems.map((item) => (
-              <View key={item.id} style={styles.frequentItem}>
-                <View style={styles.frequentIconWrap}>
-                  <Ionicons name={item.icon} size={20} color={Colors.text} />
-                </View>
-                <Text style={styles.frequentLabel}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          <Text style={styles.sectionTitle}>설정 및 관리</Text>
-          <View style={styles.settingsList}>
-            <Pressable style={styles.settingRow}>
-              <Text style={styles.settingLabel}>내 정보 관리</Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
-            </Pressable>
-            <Pressable style={styles.settingRow}>
-              <Text style={styles.settingLabel}>계정 연동 관리</Text>
-              <View style={styles.kakaoDot} />
-            </Pressable>
-            <View style={styles.settingRow}>
-              <Text style={styles.settingLabel}>알림 설정</Text>
-              <Switch
-                value={notifyOn}
-                onValueChange={setNotifyOn}
-                trackColor={{ true: Colors.primary, false: Colors.border }}
-                thumbColor="#FFFFFF"
-              />
+        <View style={s.profileRow}>
+          <Text style={s.greeting}>
+            <Text style={s.name}>{profile?.name ?? '사용자'}</Text> 님,{'\n'}오늘도{'\n'}SSOK과 함께해요!
+          </Text>
+          <View style={s.avatarWrap}>
+            <View style={s.avatar}>
+              {profile?.profileImageUrl
+                ? <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} />
+                : <Text style={s.avatarFallback}>🐹</Text>}
             </View>
-            <Pressable
-              disabled={isLoggingOut}
-              style={({ pressed }) => [styles.settingRow, pressed && styles.pressed]}
-              onPress={handleLogout}>
-              <Text style={styles.logoutLabel}>
-                {isLoggingOut ? '로그아웃 중이에요…' : '로그아웃'}
-              </Text>
+            <Pressable style={s.avatarEdit} onPress={() => router.push('/setting')}>
+              <Ionicons name="pencil" size={14} color="#FFFFFF" />
             </Pressable>
           </View>
+        </View>
+
+        <View style={s.regionCard}>
+          <View style={s.regionCopy}>
+            <Text style={s.regionCaption}>지역</Text>
+            <Text style={s.regionValue} numberOfLines={1}>{region}</Text>
+          </View>
+          <Pressable style={s.changeButton} onPress={() => router.push('/setting')}>
+            <Text style={s.changeText}>변경하기</Text>
+          </Pressable>
+        </View>
+
+        <Text style={s.sectionTitle}>자주 스캔한 항목</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.frequentRow}>
+          {FrequentItems.map((item) => (
+            <View key={item.id} style={s.frequentItem}>
+              <View style={s.frequentIcon}>
+                <Ionicons name={item.icon} size={21} color="#171717" />
+              </View>
+              <Text style={s.frequentLabel}>{item.label}</Text>
+            </View>
+          ))}
         </ScrollView>
-      </SafeAreaView>
-    </LinearGradient>
+
+        <View style={s.divider} />
+        <Text style={[s.sectionTitle, s.settingsTitle]}>설정 및 관리</Text>
+        <View style={s.settingsList}>
+          <Pressable style={s.settingRow}><Text style={s.settingLabel}>내 정보 관리</Text></Pressable>
+          <Pressable style={s.settingRow}>
+            <Text style={s.settingLabel}>계정 연동 관리</Text>
+            <View style={s.kakao}><Ionicons name="chatbubble" size={11} color="#251B00" /></View>
+          </Pressable>
+          <View style={s.settingRow}>
+            <Text style={s.settingLabel}>알림 설정</Text>
+            <Switch value={notifyOn} onValueChange={setNotifyOn}
+              trackColor={{ true: '#36D16E', false: '#D5D5D5' }} thumbColor="#FFFFFF" style={s.switch} />
+          </View>
+          <Pressable disabled={isLoggingOut} style={s.settingRow} onPress={handleLogout}>
+            <Text style={s.logout}>{isLoggingOut ? '로그아웃 중…' : '로그아웃'}</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  scroll: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxl },
-  topRow: {
-    marginTop: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  logo: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.primary },
-  pressed: { opacity: 0.6 },
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginTop: Spacing.lg,
-  },
-  profileText: { fontSize: FontSize.xxl, fontWeight: '800', color: Colors.text, lineHeight: 32 },
-  avatarWrap: { width: 56, height: 56 },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarEdit: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.text,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  regionCard: {
-    marginTop: Spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
-  },
-  regionText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.text },
-  regionLink: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: '600' },
-  sectionTitle: { marginTop: Spacing.xxl, fontSize: FontSize.md, fontWeight: '800', color: Colors.text },
-  frequentRow: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.md },
-  frequentItem: { alignItems: 'center', gap: Spacing.xs },
-  frequentIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: Radius.lg,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  frequentLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, fontWeight: '600' },
-  settingsList: { marginTop: Spacing.md, backgroundColor: '#FFFFFF', borderRadius: Radius.lg, overflow: 'hidden' },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  settingLabel: { fontSize: FontSize.md, fontWeight: '600', color: Colors.text },
-  logoutLabel: { fontSize: FontSize.md, fontWeight: '600', color: Colors.danger },
-  kakaoDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.kakao },
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+  scroll: { paddingBottom: 28 },
+  header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  logoCrop: { width: 54, height: 24, overflow: 'hidden' },
+  logo: { width: 343, height: 24, resizeMode: 'contain', alignSelf: 'flex-start' },
+  profileRow: { paddingHorizontal: 17, paddingTop: 17, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  greeting: { fontSize: 28, lineHeight: 39, fontWeight: '700', color: '#202020', letterSpacing: -0.7 },
+  name: { color: '#20B56B', fontWeight: '700' },
+  avatarWrap: { width: 98, height: 106, marginTop: -2 },
+  avatar: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#128653', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  avatarFallback: { fontSize: 61, lineHeight: 74 },
+  avatarEdit: { position: 'absolute', right: 0, bottom: 0, width: 34, height: 34, borderRadius: 17, backgroundColor: '#FF8A00', borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  regionCard: { marginTop: 31, marginHorizontal: 15, height: 88, paddingHorizontal: 23, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F7FAF8', borderRadius: 9, borderWidth: 1, borderColor: '#E1E7E3', shadowColor: '#000000', shadowOpacity: 0.09, shadowRadius: 5, shadowOffset: { width: 0, height: 1 } },
+  regionCopy: { flex: 1, marginRight: 12 },
+  regionCaption: { fontSize: 13, color: '#555555', marginBottom: 3 },
+  regionValue: { fontSize: 16, fontWeight: '700', color: '#202020', letterSpacing: -0.5 },
+  changeButton: { width: 68, height: 40, borderRadius: 8, backgroundColor: '#20B56B', alignItems: 'center', justifyContent: 'center' },
+  changeText: { fontSize: 12, fontWeight: '600', color: '#FFFFFF' },
+  sectionTitle: { marginTop: 62, marginHorizontal: 16, fontSize: 17, fontWeight: '700', color: '#202020' },
+  frequentRow: { paddingHorizontal: 16, paddingTop: 26, gap: 16 },
+  frequentItem: { width: 64, alignItems: 'center' },
+  frequentIcon: { width: 64, height: 64, borderRadius: 8, backgroundColor: '#E4F7F0', alignItems: 'center', justifyContent: 'center' },
+  frequentLabel: { marginTop: 10, fontSize: 12, color: '#333333' },
+  divider: { height: 7, marginTop: 39, backgroundColor: '#F0F0F0' },
+  settingsTitle: { marginTop: 40 },
+  settingsList: { marginTop: 25, marginHorizontal: 16, gap: 8 },
+  settingRow: { height: 48, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F3F3F3', borderRadius: 8 },
+  settingLabel: { fontSize: 15, fontWeight: '600', color: '#4A4A4A' },
+  logout: { fontSize: 15, fontWeight: '600', color: '#FF4141' },
+  kakao: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFDB00', alignItems: 'center', justifyContent: 'center' },
+  switch: { transform: [{ scaleX: 0.78 }, { scaleY: 0.78 }], marginRight: -4 },
 });
