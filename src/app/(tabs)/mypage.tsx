@@ -37,9 +37,7 @@ export default function MyPageScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.header}>
-          <View style={s.logoCrop}>
-            <Image source={require('../../../assets/images/home-header.png')} style={s.logo} />
-          </View>
+          <Text style={s.logo}>SSOK</Text>
           <Pressable hitSlop={12} onPress={() => router.push('/setting')}>
             <Ionicons name="settings-outline" size={24} color="#202020" />
           </Pressable>
@@ -109,8 +107,7 @@ const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#FFFFFF' },
   scroll: { paddingBottom: 28 },
   header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  logoCrop: { width: 54, height: 24, overflow: 'hidden' },
-  logo: { width: 343, height: 24, resizeMode: 'contain', alignSelf: 'flex-start' },
+  logo: { fontSize: 23, lineHeight: 28, fontWeight: '800', color: '#20B56B', letterSpacing: -1.4 },
   profileRow: { paddingHorizontal: 17, paddingTop: 17, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   greeting: { fontSize: 28, lineHeight: 39, fontWeight: '700', color: '#202020', letterSpacing: -0.7 },
   name: { color: '#20B56B', fontWeight: '700' },
