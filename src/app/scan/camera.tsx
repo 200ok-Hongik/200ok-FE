@@ -2,12 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image as RNImage, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { MockDetections } from '@/constants/mockData';
 import { uploadScan } from '@/services/api';
 
 const TAB_ICONS = [
@@ -18,26 +17,12 @@ const TAB_ICONS = [
   { name: 'person-outline' as const, label: 'My', route: '/(tabs)/mypage' as const },
 ];
 
-const AI_MODEL_URL = 'https://two00ok-ai.onrender.com/analyze';
-
-async function warmUpAiModel() {
-  if (Platform.OS !== 'web') return;
-  const asset = RNImage.resolveAssetSource(require('../../../assets/images/image1.png'));
-  const image = await fetch(asset.uri).then((response) => response.blob());
-  const body = new FormData();
-  body.append('image', image, 'warmup.png');
-  await fetch(AI_MODEL_URL, { method: 'POST', body, mode: 'no-cors' });
-}
-
 export default function ScanCameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
-  const [phase, setPhase] = useState<'scanning' | 'recognized'>('scanning');
-  const [activeIndex, setActiveIndex] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
-  const [isAiReady, setIsAiReady] = useState(Platform.OS !== 'web');
   const requestedRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
 
@@ -49,32 +34,10 @@ export default function ScanCameraScreen() {
     }
   }, [permission, requestPermission]);
 
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase('recognized'), 1300);
-    const t2 = setTimeout(() => setActiveIndex(1), 3000);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    warmUpAiModel()
-      .catch((error) => console.warn('AI 모델 준비 요청에 실패했습니다.', error))
-      .finally(() => !cancelled && setIsAiReady(true));
-    return () => { cancelled = true; };
-  }, []);
-
-  const active = MockDetections[Math.min(activeIndex, MockDetections.length - 1)];
   const cameraGranted = permission?.granted;
 
   const handleCapture = async () => {
     if (isUploading) return;
-    if (!isAiReady) {
-      setCaptureError('AI 분석 서버를 준비하고 있어요. 잠시만 기다려주세요.');
-      return;
-    }
     if (!cameraGranted) {
       const message = '설정에서 카메라 접근을 허용해주세요.';
       setCaptureError(message);
@@ -101,7 +64,7 @@ export default function ScanCameraScreen() {
       await cameraRef.current.pausePreview();
       setUploadStatus('사진을 분석하고 있어요…');
       const result = await uploadScan(photo.uri);
-      const resultScanId = result.scanResultId ?? (result as { scanId?: number }).scanId;
+      const resultScanId = result.scanResultId;
       if (!resultScanId) throw new Error('백엔드가 스캔 ID를 반환하지 않았어요.');
       router.push({ pathname: '/scan/captured', params: { scanId: String(resultScanId) } });
     } catch (error) {
@@ -110,11 +73,11 @@ export default function ScanCameraScreen() {
       const detail = error instanceof Error ? error.message : '';
       const message = detail.includes('502') || detail.includes('503') || detail.includes('504')
         ? 'AI 분석 서버가 응답하지 않아요. 잠시 후 다시 시도해주세요.'
-        : detail.includes('시간이 초과')
-          ? detail
-          : '사진을 전송하지 못했어요. 로그인 상태와 네트워크를 확인해주세요.';
+        : detail.includes('SSOK API 401')
+          ? '로그인 상태를 확인한 뒤 다시 시도해주세요.'
+          : detail || '사진을 전송하지 못했어요. 네트워크를 확인해주세요.';
       setCaptureError(message);
-      Alert.alert('업로드 실패', message);
+      Alert.alert('분석 실패', message);
     } finally {
       setUploadStatus(null);
       setIsUploading(false);
@@ -142,7 +105,7 @@ export default function ScanCameraScreen() {
         </View>
       )}
 
-      <View style={[StyleSheet.absoluteFill, phase === 'scanning' && styles.scanTint]} />
+      <View style={[StyleSheet.absoluteFill, styles.scanTint]} />
 
       <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
         <View style={styles.topBar}>
@@ -152,51 +115,18 @@ export default function ScanCameraScreen() {
         </View>
 
         <View style={styles.overlayArea}>
-          <View style={styles.chipRow}>
-            <View style={styles.detectionChip}>
-              <View style={styles.detectionIconWrap}>
-                <Ionicons
-                  name={active.category === 'plastic' ? 'water' : 'wine'}
-                  size={18}
-                  color={active.category === 'plastic' ? Colors.primary : '#0EA5E9'}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.detectionKind}>{active.categoryLabel}</Text>
-                <Text style={styles.detectionLabel}>{active.itemLabel}</Text>
-                <Text style={styles.detectionSub}>{active.itemType}</Text>
-              </View>
-              <Pressable style={styles.detectionArrow} onPress={handleCapture} hitSlop={8}>
-                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
-              </Pressable>
-            </View>
-            <View style={styles.dotsRow}>
-              {MockDetections.map((item, idx) => (
-                <View key={item.id} style={[styles.dot, idx === activeIndex && styles.dotActive]} />
-              ))}
-            </View>
-          </View>
-
           <View style={styles.frame}>
-            {phase === 'recognized' &&
-              MockDetections.map((item, idx) => (
-                <BoundingBox key={item.id} item={item} active={idx === activeIndex} />
-              ))}
-            {phase === 'scanning' && (
-              <View style={[styles.simpleFrame, { top: '20%', left: '10%', width: '80%', height: '55%' }]} />
-            )}
+            <View style={[styles.simpleFrame, { top: '20%', left: '10%', width: '80%', height: '55%' }]} />
           </View>
 
-          <Text style={styles.hint}>
-            {!isAiReady ? 'AI 분석 서버를 준비하고 있어요...' : phase === 'scanning' ? '재활용품을 인식하고 있어요...' : '화면을 반듯하게 유지해주세요'}
-          </Text>
+          <Text style={styles.hint}>재활용품이 잘 보이도록 화면을 반듯하게 유지해주세요</Text>
           {captureError && <Text style={styles.captureError}>{captureError}</Text>}
           {uploadStatus && <Text style={styles.uploadStatus}>{uploadStatus}</Text>}
         </View>
 
         <View style={styles.bottomArea}>
           <Pressable
-            style={[styles.shutter, (!isCameraReady || !isAiReady || isUploading) && styles.shutterDisabled]}
+            style={[styles.shutter, (!isCameraReady || isUploading) && styles.shutterDisabled]}
             onPress={handleCapture}
             disabled={isUploading}>
             {isUploading ? <ActivityIndicator color={Colors.scanDark} /> : <View style={styles.shutterInner} />}
@@ -226,24 +156,6 @@ export default function ScanCameraScreen() {
         </View>
       </SafeAreaView>
     </View>
-  );
-}
-
-function BoundingBox({ item, active }: { item: (typeof MockDetections)[number]; active: boolean }) {
-  const { top, left, width, height } = item.box;
-  return (
-    <View
-      style={[
-        styles.boundingBox,
-        {
-          top: `${top * 100}%`,
-          left: `${left * 100}%`,
-          width: `${width * 100}%`,
-          height: `${height * 100}%`,
-          borderColor: active ? Colors.primary : 'rgba(255,255,255,0.6)',
-        },
-      ]}
-    />
   );
 }
 

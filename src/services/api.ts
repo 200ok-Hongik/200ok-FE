@@ -26,13 +26,26 @@ export type ChecklistItem = {
   confidence?: number;
 };
 
-export type ScanUploadResult = {
-  scanResultId: number;
-  categoryCode: string;
-  categoryConfidence: number;
-  modelVersion: string;
-  checklistResults: ChecklistItem[];
+export type AnalysisJob = {
+  jobId: string;
+  status: string;
+  result: null | {
+    scanResultId?: number;
+    objects?: {
+      objectId: string;
+      bbox: { xMin: number; yMin: number; xMax: number; yMax: number };
+      finalResult: {
+        itemCode: string;
+        states: Record<string, unknown>;
+        source: string;
+      };
+    }[];
+    additionalObjects?: unknown[];
+  };
+  errorMessage: string | null;
 };
+
+export type ScanUploadResult = { scanResultId: number };
 
 export type ScanDetail = {
   scanId: number;
@@ -211,38 +224,31 @@ export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
     } as unknown as Blob);
   }
 
-  // Content-Type is intentionally omitted: fetch/RN must generate it itself
-  // (including the multipart boundary) from the FormData body. Setting it
-  // manually here breaks the boundary and the request fails outright.
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
+  // Content-Type is omitted so fetch can add the multipart boundary.
+  const job = await request<AnalysisJob>('/api/ai/analysis', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!job?.jobId) throw new Error('백엔드가 AI 작업 ID를 반환하지 않았어요.');
 
-    try {
-      return await request<ScanUploadResult>('/api/scans', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      const retryable = error instanceof Error && (
-        error.name === 'AbortError' || /\b(502|503|504)\b/.test(message)
-      );
-      if (attempt === 0 && retryable) {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        continue;
-      }
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error('AI 서버가 응답하지 않아요. 잠시 후 다시 시도해주세요.');
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    const current = await request<AnalysisJob>(`/api/ai/analysis/${encodeURIComponent(job.jobId)}`);
+    const status = current.status?.toUpperCase();
+
+    if (status === 'COMPLETED') {
+      const scanResultId = current.result?.scanResultId;
+      if (!scanResultId) throw new Error('완료된 분석에 스캔 결과 ID가 없어요.');
+      return { scanResultId };
     }
+    if (status === 'FAILED') {
+      throw new Error(current.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
   }
 
-  throw new Error('AI 분석 요청을 완료하지 못했어요.');
+  throw new Error('AI 분석 시간이 초과되었어요. 잠시 후 다시 시도해주세요.');
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
