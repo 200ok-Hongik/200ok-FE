@@ -113,20 +113,6 @@ type HistoryViewEntry = {
   isCompleted: boolean;
 };
 
-function WebStatusBar() {
-  if (Platform.OS !== 'web') return null;
-  return (
-    <View style={styles.webStatusBar}>
-      <Text style={styles.webStatusTime}>9:41</Text>
-      <View style={styles.webStatusIcons}>
-        <Ionicons name="cellular" size={13} color="#111111" />
-        <Ionicons name="wifi" size={13} color="#111111" />
-        <Ionicons name="battery-full" size={16} color="#111111" />
-      </View>
-    </View>
-  );
-}
-
 function TrashDay({ count }: { count: number }) {
   const used = count > 0;
   return (
@@ -256,8 +242,6 @@ export default function HistoryScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <WebStatusBar />
-
       <View style={styles.header}>
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={27} color="#454545" />
@@ -480,15 +464,6 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  webStatusBar: {
-    height: 44,
-    paddingHorizontal: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  webStatusTime: { color: '#111111', fontSize: 14, fontWeight: '700' },
-  webStatusIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
   backButton: { width: 34, height: 34, alignItems: 'flex-start', justifyContent: 'center' },
   headerTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', color: '#111111', marginLeft: 5 },

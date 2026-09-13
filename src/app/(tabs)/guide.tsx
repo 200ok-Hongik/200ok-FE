@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -19,20 +19,6 @@ const CATEGORY_ART: Record<string, string> = {
   styrofoam: '🍱',
 };
 
-function WebStatusBar() {
-  if (Platform.OS !== 'web') return null;
-  return (
-    <View style={styles.statusBar}>
-      <Text style={styles.statusTime}>9:41</Text>
-      <View style={styles.statusIcons}>
-        <Ionicons name="cellular" size={13} color="#071A12" />
-        <Ionicons name="wifi" size={13} color="#071A12" />
-        <Ionicons name="battery-full" size={16} color="#071A12" />
-      </View>
-    </View>
-  );
-}
-
 export default function GuideScreen() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -46,8 +32,6 @@ export default function GuideScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.greenHeader}>
-          <WebStatusBar />
-
           <View style={styles.searchRow}>
             <Pressable style={styles.voiceButton} accessibilityLabel="음성 검색">
               <Ionicons name="mic-outline" size={23} color="#FFFFFF" />
@@ -149,15 +133,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#24B975' },
   scroll: { flexGrow: 1, backgroundColor: '#24B975' },
   greenHeader: { paddingHorizontal: 16, paddingBottom: 22 },
-  statusBar: {
-    height: 44,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  statusTime: { color: '#071A12', fontSize: 14, fontWeight: '700' },
-  statusIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   searchRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
   voiceButton: {
     width: 52,

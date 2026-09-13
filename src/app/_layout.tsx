@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -10,6 +10,8 @@ import { WEB_FRAME_ID } from '@/components/ui/OverlayModal';
 const isWeb = Platform.OS === 'web';
 
 export default function RootLayout() {
+  const { width } = useWindowDimensions();
+  const isMobileWeb = isWeb && width <= 600;
   const [fontsLoaded, fontError] = useFonts({
     PretendardThin: require('../../assets/fonts/Pretendard-Thin.otf'),
     PretendardExtraLight: require('../../assets/fonts/Pretendard-ExtraLight.otf'),
@@ -42,7 +44,7 @@ export default function RootLayout() {
         <StatusBar style="dark" />
         {isWeb ? (
           <View style={styles.webBackdrop}>
-            <View style={styles.webFrame} nativeID={WEB_FRAME_ID}>
+            <View style={[styles.webFrame, isMobileWeb && styles.mobileWebFrame]} nativeID={WEB_FRAME_ID}>
               {stack}
             </View>
           </View>
@@ -70,5 +72,10 @@ const styles = StyleSheet.create({
     maxHeight: 812,
     overflow: 'hidden',
     boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 30px 60px rgba(0,0,0,0.45)',
+  },
+  mobileWebFrame: {
+    maxWidth: undefined,
+    maxHeight: undefined,
+    boxShadow: 'none',
   },
 });

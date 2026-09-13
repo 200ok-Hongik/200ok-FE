@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OnboardingPreviewArt } from '@/components/OnboardingPreviewArt';
@@ -13,6 +13,9 @@ import { Colors } from '@/constants/theme';
 import { FRONTEND_URL, getProfile, KAKAO_LOGIN_URL } from '@/services/api';
 
 export default function OnboardingScreen() {
+  const now = new Date();
+  const displayTime = `${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const displayPeriod = now.getHours() < 12 ? '오전' : '오후';
   const handleKakaoLogin = async () => {
     if (Platform.OS === 'web') {
       window.location.assign(KAKAO_LOGIN_URL);
@@ -35,25 +38,10 @@ export default function OnboardingScreen() {
       locations={[0, 0.43, 1]}
       style={styles.flex}>
       <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
-        <View style={styles.content}>
-          {Platform.OS === 'web' && (
-            <View style={styles.statusBar}>
-              <Text style={styles.statusTime}>9:41</Text>
-              <View style={styles.statusIcons}>
-                <View style={styles.cellularBars}>
-                  <View style={[styles.cellularBar, { height: 5 }]} />
-                  <View style={[styles.cellularBar, { height: 8 }]} />
-                  <View style={[styles.cellularBar, { height: 11 }]} />
-                  <View style={[styles.cellularBar, { height: 14 }]} />
-                </View>
-                <Ionicons name="wifi" size={16} color="#000000" />
-                <View style={styles.battery}>
-                  <View style={styles.batteryFill} />
-                </View>
-              </View>
-            </View>
-          )}
-
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          bounces={false}>
           <View style={styles.main}>
           <Text style={styles.title}>
             헷갈리는 분리배출,{`\n`}
@@ -77,7 +65,7 @@ export default function OnboardingScreen() {
 
                   <View style={styles.previewContent}>
                     <View style={styles.previewStatusBar}>
-                      <Text style={styles.previewStatusTime}>9:41</Text>
+                      <Text style={styles.previewStatusTime}>{displayTime}</Text>
                       <View style={styles.previewStatusIcons}>
                         <Ionicons name="cellular" size={9} color="rgba(255,255,255,0.88)" />
                         <Ionicons name="wifi" size={9} color="rgba(255,255,255,0.88)" />
@@ -116,7 +104,7 @@ export default function OnboardingScreen() {
 
               <View style={styles.notifyBanner}>
                 <View style={styles.notifyContent}>
-                  <Text style={styles.notifyTime}>오후 9:41</Text>
+                  <Text style={styles.notifyTime}>{displayPeriod} {displayTime}</Text>
                   <View style={styles.notifyMessageRow}>
                     <Image
                       source={require('../../assets/images/onboarding-notification-icon.svg')}
@@ -147,8 +135,7 @@ export default function OnboardingScreen() {
           </Text>
           </View>
 
-          {Platform.OS === 'web' && <View style={styles.homeIndicator} />}
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -157,57 +144,15 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: {
-    flex: 1,
-    paddingTop: Platform.OS === 'web' ? 17 : 8,
+    flexGrow: 1,
+    paddingTop: 8,
     paddingHorizontal: 22,
     paddingBottom: 8,
-  },
-  statusBar: {
-    height: 38,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  statusTime: {
-    color: '#000000',
-    fontSize: 17,
-    lineHeight: 21,
-    fontWeight: '700',
-  },
-  statusIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  cellularBars: {
-    height: 15,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 2,
-  },
-  cellularBar: {
-    width: 3,
-    borderRadius: 1,
-    backgroundColor: '#000000',
-  },
-  battery: {
-    width: 23,
-    height: 12,
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 3,
-    padding: 1.5,
-  },
-  batteryFill: {
-    flex: 1,
-    borderRadius: 1,
-    backgroundColor: '#000000',
   },
   main: { flex: 1 },
   title: {
     textAlign: 'center',
-    marginTop: 66,
+    marginTop: 56,
     fontSize: 22,
     fontWeight: '700',
     color: '#0B0B0B',
@@ -396,13 +341,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 19,
     fontWeight: '500',
-  },
-  homeIndicator: {
-    alignSelf: 'center',
-    width: 135,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#000000',
-    marginTop: 12,
   },
 });

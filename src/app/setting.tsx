@@ -72,16 +72,6 @@ export default function SettingScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {Platform.OS === 'web' && (
-        <View style={styles.webStatusBar}>
-          <Text style={styles.webStatusTime}>9:41</Text>
-          <View style={styles.webStatusIcons}>
-            <Ionicons name="cellular" size={14} color="#111111" />
-            <Ionicons name="wifi" size={14} color="#111111" />
-            <Ionicons name="battery-full" size={17} color="#111111" />
-          </View>
-        </View>
-      )}
       <ScreenHeader />
       <View style={styles.content}>
         <Text style={styles.title}>
@@ -141,22 +131,12 @@ export default function SettingScreen() {
           onPress={handleComplete}
         />
       </View>
-      {Platform.OS === 'web' && <View style={styles.webHomeIndicator} />}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  webStatusBar: {
-    height: 44,
-    paddingHorizontal: 43,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  webStatusTime: { fontSize: 14, lineHeight: 18, fontWeight: '700', color: '#111111' },
-  webStatusIcons: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   content: {
     flex: 1,
     paddingHorizontal: 13,
@@ -220,13 +200,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   spacer: { flex: 1 },
-  webHomeIndicator: {
-    position: 'absolute',
-    bottom: 8,
-    alignSelf: 'center',
-    width: 127,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#3E3E3E',
-  },
 });

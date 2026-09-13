@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Tabs } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 
 import { Colors } from '@/constants/theme';
@@ -75,7 +75,6 @@ export default function TabsLayout() {
         }}
       />
       </Tabs>
-      {Platform.OS === 'web' && <View style={styles.homeIndicator} />}
     </View>
   );
 }
@@ -93,15 +92,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     marginTop: 2,
-  },
-  homeIndicator: {
-    position: 'absolute',
-    bottom: 3,
-    alignSelf: 'center',
-    width: 127,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#2E2E2E',
-    zIndex: 100,
   },
 });
