@@ -56,7 +56,7 @@ function ReminderArt() {
 
 export default function HomeScreen() {
   const { feedback, scanId } = useLocalSearchParams<{ feedback?: string; scanId?: string }>();
-  const [reminderVisible, setReminderVisible] = useState(true);
+  const [reminderVisible, setReminderVisible] = useState(false);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
@@ -116,11 +116,11 @@ export default function HomeScreen() {
       <WebStatusBar />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Image
-            source={require('../../../assets/images/home-header.png')}
-            style={styles.headerAsset}
-            contentFit="contain"
-          />
+          <Text style={styles.logo}>SSOK</Text>
+          <View style={styles.notificationWrap}>
+            <Ionicons name="notifications" size={22} color="#198B55" />
+            <View style={styles.notificationDot} />
+          </View>
         </View>
 
         <Text style={styles.heading}>
@@ -173,8 +173,7 @@ export default function HomeScreen() {
         <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator
-          persistentScrollbar
+          showsHorizontalScrollIndicator={false}
           style={styles.frequentScroller}
           contentContainerStyle={styles.frequentRow}>
           {FrequentItems.map((item) => (
@@ -271,8 +270,23 @@ const styles = StyleSheet.create({
   header: {
     paddingTop: 14,
     paddingBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  headerAsset: { width: '100%', height: 24 },
+  logo: { color: '#20B56B', fontSize: 23, lineHeight: 28, fontWeight: '800', letterSpacing: -1.4 },
+  notificationWrap: { width: 24, height: 26, alignItems: 'center', justifyContent: 'center' },
+  notificationDot: {
+    position: 'absolute',
+    top: 1,
+    right: 1,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F46D75',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
   heading: { marginTop: 14, fontSize: 26, lineHeight: 33, fontWeight: '800', color: Colors.text, letterSpacing: -0.8 },
   headingAccent: { color: Colors.primaryDark },
   subheading: {
@@ -292,7 +306,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   scanCardRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  scanCardTitle: { fontSize: 20, lineHeight: 25, fontWeight: '700', color: Colors.text },
+  scanCardTitle: { fontSize: 18, lineHeight: 24, fontWeight: '700', color: Colors.text, letterSpacing: -0.35 },
   scanCardDesc: { marginTop: 14, color: '#303432', fontSize: 13, lineHeight: 19, fontWeight: '400' },
   recyclingArt: {
     width: 112,
