@@ -55,9 +55,11 @@ export default function GuideScreen() {
               <Text style={styles.heroTitle}>내 손안의 분리배출</Text>
             </View>
             <Image
-              source={require('../../../assets/images/guide-recycle.svg')}
+              source={require('../../../assets/images/guide-recycle.png')}
               style={styles.heroArt}
               contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={0}
             />
           </View>
           <View style={styles.heroDots}>
