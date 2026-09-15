@@ -113,6 +113,20 @@ type HistoryViewEntry = {
   isCompleted: boolean;
 };
 
+function historyIconForItem(itemLabel: string): keyof typeof Ionicons.glyphMap {
+  const label = itemLabel.replace(/\s/g, '');
+  if (label.includes('페트')) return 'water-outline';
+  if (label.includes('유리')) return 'wine-outline';
+  if (label.includes('캔') || label.includes('알루미늄') || label.includes('철')) return 'archive-outline';
+  if (label.includes('비닐')) return 'bag-handle-outline';
+  if (label.includes('종이팩')) return 'file-tray-full-outline';
+  if (label.includes('종이') || label.includes('신문') || label.includes('책자')) return 'document-text-outline';
+  if (label.includes('스티로폼')) return 'cube-outline';
+  if (label.includes('플라스틱')) return 'flask-outline';
+  if (label.includes('일반쓰레기')) return 'trash-outline';
+  return 'leaf-outline';
+}
+
 function TrashDay({ count }: { count: number }) {
   const used = count > 0;
   return (
@@ -318,7 +332,7 @@ export default function HistoryScreen() {
             ) : (
               selectedEntries.map((entry) => (
                 <View key={entry.id} style={styles.entryRow}>
-                  <Ionicons name="water-outline" size={25} color="#222222" />
+                  <Ionicons name={historyIconForItem(entry.itemLabel)} size={25} color="#222222" />
                   <Text style={styles.entryTime}>{entry.time}</Text>
                   <View style={styles.entryAccent} />
                   <Text numberOfLines={1} style={styles.entryMethod}>{entry.method}</Text>
