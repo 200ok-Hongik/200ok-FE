@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   kakaoButton: {
     height: 50,
     borderRadius: 9,
-    marginTop: 22,
+    marginTop: 36,
   },
   kakaoButtonLabel: {
     fontSize: 16,
