@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   heroEyebrow: { color: '#E7FFF2', fontSize: 17, lineHeight: 24, fontWeight: '400' },
   heroTitle: { color: '#FFFFFF', fontSize: 21, lineHeight: 30, fontWeight: '800', marginTop: 4 },
-  heroArt: { width: 93, height: 88 },
+  heroArt: { width: 112, height: 106 },
   heroDots: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingLeft: 7 },
   heroDotLong: { width: 16, height: 3, borderRadius: 2, backgroundColor: '#165C3D' },
   heroDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
