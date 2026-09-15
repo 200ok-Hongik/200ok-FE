@@ -54,10 +54,10 @@ export default function ScanCameraScreen() {
       setUploadStatus('사진을 촬영하고 있어요…');
       setIsUploading(true);
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.5,
+        quality: 1,
         base64: Platform.OS === 'web',
         imageType: Platform.OS === 'web' ? 'jpg' : undefined,
-        scale: Platform.OS === 'web' ? 0.5 : undefined,
+        scale: Platform.OS === 'web' ? 1 : undefined,
       });
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
 
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   permissionFallback: { alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
   permissionText: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm },
-  scanTint: { backgroundColor: 'rgba(34,197,94,0.14)' },
+  scanTint: { backgroundColor: 'rgba(34,197,94,0.04)' },
   topBar: { flexDirection: 'row', paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
   closeButton: {
     width: 36,
