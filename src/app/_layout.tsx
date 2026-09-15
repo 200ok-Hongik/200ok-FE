@@ -43,7 +43,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="dark" />
         {isWeb ? (
-          <View style={styles.webBackdrop}>
+          <View style={[styles.webBackdrop, isMobileWeb && styles.mobileWebBackdrop]}>
             <View style={[styles.webFrame, isMobileWeb && styles.mobileWebFrame]} nativeID={WEB_FRAME_ID}>
               {stack}
             </View>
@@ -74,8 +74,15 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 0 1px rgba(255,255,255,0.06), 0 30px 60px rgba(0,0,0,0.45)',
   },
   mobileWebFrame: {
-    maxWidth: undefined,
-    maxHeight: undefined,
+    width: '100%',
+    maxWidth: '100%',
+    height: '100%',
+    maxHeight: '100%',
     boxShadow: 'none',
+  },
+  mobileWebBackdrop: {
+    alignItems: 'stretch',
+    justifyContent: 'flex-start',
+    backgroundColor: '#FFFFFF',
   },
 });
