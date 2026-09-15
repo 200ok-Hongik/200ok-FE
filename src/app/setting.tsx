@@ -108,13 +108,11 @@ export default function SettingScreen() {
           />
           <SelectField
             placeholder="동을 선택해주세요."
-            helperLabel="동을 선택해주세요."
             value={town}
             options={townOptions}
             style={styles.selectField}
             textStyle={styles.selectText}
             inline
-            keepOpenOnSelect
             disabled={!district}
             onChange={setTown}
           />
