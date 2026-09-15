@@ -82,15 +82,15 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   tabBar: {
-    height: 109,
-    paddingTop: 12,
-    paddingBottom: 27,
+    height: 78,
+    paddingTop: 8,
+    paddingBottom: 10,
     borderTopColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   label: {
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 0,
   },
 });
