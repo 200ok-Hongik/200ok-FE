@@ -258,6 +258,10 @@ export default function HistoryScreen() {
         </View>
       </View>
 
+      <ScrollView
+        style={styles.screenScroll}
+        contentContainerStyle={styles.screenContent}
+        showsVerticalScrollIndicator={false}>
       <Pressable style={styles.monthRow} onPress={openDatePicker}>
         <Text style={styles.monthText}>{cursor.year}. {String(cursor.month + 1).padStart(2, '0')}</Text>
         <Ionicons name={pickerVisible ? 'caret-up' : 'caret-down'} size={12} color="#222222" />
@@ -308,7 +312,7 @@ export default function HistoryScreen() {
             <Text style={styles.historyDate}>{selectedLabel}</Text>
             <Ionicons name="ellipsis-vertical" size={22} color="#555555" />
           </View>
-          <ScrollView style={styles.entryScroll} contentContainerStyle={styles.entryList} showsVerticalScrollIndicator={false}>
+          <View style={styles.entryList}>
             {selectedEntries.length === 0 ? (
               <Text style={styles.emptyText}>이날은 분리배출 기록이 없어요.</Text>
             ) : (
@@ -321,9 +325,10 @@ export default function HistoryScreen() {
                 </View>
               ))
             )}
-          </ScrollView>
+          </View>
         </>
       )}
+      </ScrollView>
 
       <OverlayModal visible={pickerVisible} animationType="fade" onRequestClose={() => setPickerVisible(false)}>
         <View style={styles.modalBackdrop}>
@@ -464,6 +469,8 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  screenScroll: { flex: 1 },
+  screenContent: { paddingBottom: 24 },
   header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
   backButton: { width: 34, height: 34, alignItems: 'flex-start', justifyContent: 'center' },
   headerTitle: { fontSize: 20, lineHeight: 26, fontWeight: '800', color: '#111111', marginLeft: 5 },
@@ -541,7 +548,6 @@ const styles = StyleSheet.create({
   sectionDivider: { height: 7, backgroundColor: '#F5F5F5', borderTopWidth: 1, borderTopColor: '#EEEEEE' },
   historyHeader: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   historyDate: { fontSize: 17, lineHeight: 22, fontWeight: '800', color: '#222222' },
-  entryScroll: { flex: 1 },
   entryList: { paddingHorizontal: 16, paddingBottom: 18, gap: 12 },
   entryRow: { height: 48, paddingHorizontal: 14, borderRadius: 4, backgroundColor: '#F1F1F1', flexDirection: 'row', alignItems: 'center' },
   entryTime: { marginLeft: 8, fontSize: 15, color: '#222222', fontWeight: '600' },
