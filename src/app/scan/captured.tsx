@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Text } from '@/components/ui/Text';
+import { getSeparationLabel } from '@/constants/separation';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { confirmScanResult, getScan, getTrashCategories, type ScanDetail, type TrashCategory } from '@/services/api';
 
@@ -89,7 +90,7 @@ export default function ScanCapturedScreen() {
       await confirmScanResult(scan.scanId, {
         categoryId: selectedCategory?.categoryId ?? scan.category.categoryId,
         states,
-        comment: `구성품 분리: ${separation}`,
+        comment: `${getSeparationLabel(itemType)}: ${separation}`,
       });
       router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId) } });
     } catch (reason) {
@@ -121,7 +122,7 @@ export default function ScanCapturedScreen() {
               <View style={styles.settingLabelWrap}><Ionicons name="water-outline" size={15} color={Colors.primaryDark} /><Text style={styles.settingLabel}>오염 상태</Text></View>
               <View style={styles.toggle}><Pressable onPress={() => setContaminated(false)} style={[styles.toggleItem, !contaminated && styles.toggleSelected]}><Text style={styles.toggleText}>깨끗함</Text></Pressable><Pressable onPress={() => setContaminated(true)} style={[styles.toggleItem, contaminated && styles.toggleSelected]}><Text style={styles.toggleText}>오염됨</Text></Pressable></View>
             </View>
-            <SettingRow icon="refresh-outline" label="구성품 분리" value={separation} arrow onPress={() => setPicker('separation')} />
+            <SettingRow icon="refresh-outline" label={getSeparationLabel(itemType)} value={separation} arrow onPress={() => setPicker('separation')} />
           </View>
 
           <View style={styles.editNote}><Ionicons name="add-circle" size={15} color={Colors.primaryDark} /><Text style={styles.editNoteText}>인식 결과가 다르다면{`\n`}필요한 항목만 수정해 주세요.</Text></View>
@@ -131,7 +132,7 @@ export default function ScanCapturedScreen() {
       </ScrollView>
 
       <View style={styles.tabBar}>{TABS.map((tab) => <Pressable key={tab.label} style={styles.tabItem} onPress={() => router.replace(tab.route)}><Ionicons name={tab.icon} size={19} color={tab.label === '스캔' ? Colors.primary : '#202725'} /><Text style={[styles.tabLabel, tab.label === '스캔' && styles.tabActive]}>{tab.label}</Text></Pressable>)}</View>
-      <BottomSheet visible={picker !== null} onClose={() => setPicker(null)} title={picker === 'type' ? '종류 선택' : '구성품 분리'}>
+      <BottomSheet visible={picker !== null} onClose={() => setPicker(null)} title={picker === 'type' ? '종류 선택' : getSeparationLabel(itemType)}>
         {(picker === 'type' ? ITEM_TYPES : ['완료', '안 함', '해당 없음']).map((option) => (
           <Pressable key={option} style={styles.pickerOption} onPress={() => {
             if (picker === 'type') {
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
   resultEyebrow: { textAlign: 'center', fontSize: 12, color: Colors.text }, resultText: { marginTop: 4, textAlign: 'center', fontSize: 15, fontWeight: '600', color: Colors.text }, resultAccent: { color: Colors.primaryDark, fontWeight: '800' },
   settingsCard: { marginTop: 18, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, overflow: 'hidden' },
   settingRow: { minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: '#FFFFFF' },
-  settingLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 }, settingLabel: { fontSize: 12, fontWeight: '700', color: Colors.text },
+  settingLabelWrap: { flex: 1, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }, settingLabel: { flexShrink: 1, fontSize: 12, fontWeight: '700', color: Colors.text },
   selectValue: { minWidth: 98, height: 30, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, borderWidth: 1, borderColor: Colors.border, borderRadius: 5 },
   plainValue: { maxWidth: 170, flexDirection: 'row', alignItems: 'center', gap: 7 }, settingValueText: { flexShrink: 1, fontSize: 11, color: Colors.text },
   toggle: { height: 30, flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 5, overflow: 'hidden' }, toggleItem: { minWidth: 54, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 }, toggleSelected: { backgroundColor: '#DDF7EA', borderColor: Colors.primaryDark, borderWidth: 1 }, toggleText: { fontSize: 10, color: Colors.text },

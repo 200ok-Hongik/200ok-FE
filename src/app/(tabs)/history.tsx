@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Text } from '@/components/ui/Text';
+import { getSeparationLabel } from '@/constants/separation';
 import { Colors } from '@/constants/theme';
 import { HistoryEntries } from '@/constants/mockData';
 import { getCalendars } from '@/services/api';
@@ -232,7 +233,7 @@ export default function HistoryScreen() {
         date,
         time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
         itemLabel: itemType,
-        method: `${itemType} · 구성품 ${separationStatus}`,
+        method: `${itemType} · ${getSeparationLabel(itemType)} ${separationStatus}`,
         isCompleted: true,
       },
     ]);
@@ -418,7 +419,7 @@ export default function HistoryScreen() {
             <View style={styles.settingRow}>
               <View style={styles.settingLabelWrap}>
                 <Image source={require('../../../assets/images/item-separation.svg')} style={styles.settingIcon} resizeMode="contain" />
-                <Text style={styles.settingLabel}>구성품 분리</Text>
+                <Text style={styles.settingLabel}>{getSeparationLabel(itemType)}</Text>
               </View>
               <View style={styles.separationToggle}>
                 {(['완료', '안 함', '해당 없음'] as const).map((option) => (
@@ -586,10 +587,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E2E2',
   },
-  settingLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingLabelWrap: { flex: 1, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 12 },
   typeSettingRow: { zIndex: 4 },
   settingIcon: { width: 20, height: 22 },
-  settingLabel: { color: '#222222', fontSize: 15, lineHeight: 20, fontWeight: '700' },
+  settingLabel: { flexShrink: 1, color: '#222222', fontSize: 15, lineHeight: 20, fontWeight: '700' },
   requiredMark: { color: '#22A162', fontWeight: '700' },
   selectBox: {
     width: 170,
