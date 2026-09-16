@@ -28,6 +28,30 @@ const CATEGORY_ICON_SOURCES = {
   styrofoam: require('../../../assets/images/guide-categories/styrofoam.svg'),
 };
 
+function getBannerTags(now = new Date()) {
+  const hour = now.getHours();
+  const day = now.getDay();
+  const month = now.getMonth() + 1;
+
+  const timeTag = hour < 6
+    ? '#새벽실천'
+    : hour < 12
+      ? '#좋은아침'
+      : hour < 18
+        ? '#오늘도실천'
+        : '#저녁정리';
+  const dayTag = day === 0 || day === 6 ? '#주말정리' : '#분리배출습관';
+  const seasonTag = month >= 3 && month <= 5
+    ? '#봄맞이정리'
+    : month >= 6 && month <= 8
+      ? '#여름분리배출'
+      : month >= 9 && month <= 11
+        ? '#가을정리'
+        : '#겨울실천';
+
+  return [timeTag, dayTag, seasonTag];
+}
+
 export default function GuideScreen() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -36,6 +60,7 @@ export default function GuideScreen() {
     () => GuideCategories.filter((category) => category.label.includes(query.trim())),
     [query]
   );
+  const bannerTags = useMemo(() => getBannerTags(), []);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -105,7 +130,7 @@ export default function GuideScreen() {
             <View style={styles.bannerCopy}>
               <Text style={styles.bannerTitle}>AI로 SCAN하고{`\n`}쉽게 분리배출을 기록하자!</Text>
               <View style={styles.tagRow}>
-                {['#간편함', '#편리함', '#J형인간'].map((tag) => (
+                {bannerTags.map((tag) => (
                   <Pressable
                     key={tag}
                     accessibilityRole="text"
