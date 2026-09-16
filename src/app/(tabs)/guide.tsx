@@ -19,6 +19,15 @@ const CATEGORY_ART: Record<string, string> = {
   styrofoam: '🍱',
 };
 
+const CATEGORY_ICON_SOURCES = {
+  paper: require('../../../assets/images/guide-categories/paper.svg'),
+  glass: require('../../../assets/images/guide-categories/glass.svg'),
+  plastic: require('../../../assets/images/guide-categories/plastic.svg'),
+  can: require('../../../assets/images/guide-categories/can.svg'),
+  vinyl: require('../../../assets/images/guide-categories/vinyl.svg'),
+  styrofoam: require('../../../assets/images/guide-categories/styrofoam.svg'),
+};
+
 export default function GuideScreen() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -75,7 +84,12 @@ export default function GuideScreen() {
                 key={category.id}
                 style={({ pressed }) => [styles.categoryItem, pressed && styles.pressed]}
                 onPress={() => setActiveCategory(category.id)}>
-                <Text style={styles.categoryEmoji}>{CATEGORY_ART[category.id] ?? category.emoji}</Text>
+                <Image
+                  source={CATEGORY_ICON_SOURCES[category.id as keyof typeof CATEGORY_ICON_SOURCES]}
+                  style={styles.categoryArt}
+                  contentFit="contain"
+                  transition={0}
+                />
                 <Text style={styles.categoryLabel}>{category.label}</Text>
               </Pressable>
             ))}
@@ -187,7 +201,7 @@ const styles = StyleSheet.create({
   },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 27 },
   categoryItem: { width: '33.333%', alignItems: 'center', gap: 6 },
-  categoryEmoji: { fontSize: 42, lineHeight: 50 },
+  categoryArt: { width: 78, height: 58 },
   categoryLabel: { color: '#4D4D4D', fontSize: 13, lineHeight: 18, fontWeight: '500' },
   pressed: { opacity: 0.62 },
   emptyText: { paddingVertical: 60, textAlign: 'center', color: Colors.textTertiary, fontSize: 13 },
