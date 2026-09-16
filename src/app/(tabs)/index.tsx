@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
+import { SsokLogo } from '@/components/ui/SsokLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
@@ -101,7 +102,7 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.logo}>SSOK</Text>
+          <SsokLogo width={78} />
           <View style={styles.notificationWrap}>
             <Ionicons name="notifications" size={22} color="#198B55" />
             <View style={styles.notificationDot} />

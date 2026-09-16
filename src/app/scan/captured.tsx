@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/Button';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Text } from '@/components/ui/Text';
+import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { confirmScanResult, getScan, getTrashCategories, type ScanDetail, type TrashCategory } from '@/services/api';
@@ -109,7 +110,7 @@ export default function ScanCapturedScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.photoArea}>
           {scan.imageUrl ? <Image source={{ uri: scan.imageUrl }} style={styles.photoImage} resizeMode="cover" /> : <View style={[styles.photoImage, styles.photoFallback]}><Ionicons name="image-outline" size={44} color="#FFFFFF" /></View>}
-          <View style={styles.photoHeader}><Pressable hitSlop={12} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color="#FFFFFF" /></Pressable><Text style={styles.logo}>SSOK</Text></View>
+          <View style={styles.photoHeader}><Pressable hitSlop={12} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color="#FFFFFF" /></Pressable><SsokLogo width={49} color="#FFFFFF" /></View>
         </View>
 
         <View style={styles.resultPanel}>

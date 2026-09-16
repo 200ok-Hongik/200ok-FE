@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
+import { SsokLogo } from '@/components/ui/SsokLogo';
 
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 
@@ -21,9 +22,11 @@ export function ScreenHeader({ title, onBack, dark, right }: Props) {
         style={[styles.iconButton, dark && styles.iconButtonDark]}>
         <Ionicons name="chevron-back" size={22} color={dark ? '#FFFFFF' : Colors.text} />
       </Pressable>
-      <Text style={[styles.title, dark && styles.titleDark]} numberOfLines={1}>
-        {title}
-      </Text>
+      <View style={styles.title}>
+        {title === 'SSOK'
+          ? <SsokLogo width={58} color={dark ? '#FFFFFF' : '#26B36D'} />
+          : <Text style={dark && styles.titleDark} numberOfLines={1}>{title}</Text>}
+      </View>
       <View style={styles.right}>{right}</View>
     </View>
   );
@@ -45,10 +48,10 @@ const styles = StyleSheet.create({
   iconButtonDark: {},
   title: {
     flex: 1,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
     fontSize: FontSize.lg,
     fontWeight: '700',
-    color: Colors.text,
     marginRight: 36,
   },
   titleDark: {

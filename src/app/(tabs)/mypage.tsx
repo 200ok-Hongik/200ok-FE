@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
+import { SsokLogo } from '@/components/ui/SsokLogo';
 import { FrequentItems } from '@/constants/mockData';
 import { getProfile, logout, type UserProfile } from '@/services/api';
 
@@ -37,7 +38,7 @@ export default function MyPageScreen() {
     <SafeAreaView style={s.safe} edges={['top']}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.header}>
-          <Text style={s.logo}>SSOK</Text>
+          <SsokLogo width={58} />
           <Pressable hitSlop={12} onPress={() => router.push('/setting')}>
             <Ionicons name="settings-outline" size={24} color="#202020" />
           </Pressable>

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Text } from '@/components/ui/Text';
+import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors } from '@/constants/theme';
 import { HistoryEntries } from '@/constants/mockData';
@@ -248,7 +249,7 @@ export default function HistoryScreen() {
         <Pressable style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={27} color="#454545" />
         </Pressable>
-        <Text style={styles.headerTitle}>SSOK</Text>
+        <SsokLogo width={58} />
         <View style={styles.headerTools}>
           <Pressable style={styles.headerToolButton} onPress={() => setSelected((value) => value ? null : todayKey)}>
             <Ionicons name="list" size={22} color={selected ? Colors.primary : '#222222'} />
