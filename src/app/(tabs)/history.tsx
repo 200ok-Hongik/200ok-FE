@@ -14,20 +14,8 @@ const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const YEARS = Array.from({ length: 21 }, (_, index) => 2020 + index);
 const MONTHS = Array.from({ length: 12 }, (_, index) => index);
 
-const MATERIAL_OPTIONS = {
-  '무색 페트병': ['PET'],
-  '플라스틱류': ['PET', 'HDPE', 'LDPE', 'PP', 'PS', 'OTHER'],
-  '캔류': ['알루미늄', '철'],
-  '유리병류': ['투명 유리', '갈색 유리', '녹색 유리', '기타'],
-  '비닐류': ['LDPE', 'HDPE', 'PP', 'OTHER'],
-  '종이류': ['일반 종이', '종이상자', '신문지', '책자·노트'],
-  '종이팩': ['일반팩(살균팩)', '멸균팩'],
-  '스티로폼류': ['포장용 스티로폼', '완충재', '식품 용기'],
-  '일반쓰레기': ['재활용 불가 플라스틱', '오염된 종이·비닐', '복합재질', '기타'],
-} as const;
-
-type ItemType = keyof typeof MATERIAL_OPTIONS;
-const HISTORY_ITEM_TYPES = Object.keys(MATERIAL_OPTIONS) as ItemType[];
+const HISTORY_ITEM_TYPES = ['무색 페트병', '플라스틱류', '캔류', '유리병류', '비닐류', '종이류', '종이팩', '스티로폼류', '일반쓰레기'] as const;
+type ItemType = (typeof HISTORY_ITEM_TYPES)[number];
 
 function WheelColumn({ values, value, onChange, suffix = '' }: {
   values: number[];
@@ -156,8 +144,7 @@ export default function HistoryScreen() {
     day: today.getDate(),
   });
   const [itemType, setItemType] = useState<ItemType | null>(null);
-  const [material, setMaterial] = useState('모르겠어요');
-  const [openDropdown, setOpenDropdown] = useState<'type' | 'material' | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<'type' | null>(null);
   const [typeError, setTypeError] = useState(false);
   const [isClean, setIsClean] = useState(true);
   const [separationStatus, setSeparationStatus] = useState<'완료' | '안 함' | '해당 없음'>('해당 없음');
@@ -245,7 +232,7 @@ export default function HistoryScreen() {
         date,
         time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
         itemLabel: itemType,
-        method: `${itemType} · ${material} · 구성품 ${separationStatus}`,
+        method: `${itemType} · 구성품 ${separationStatus}`,
         isCompleted: true,
       },
     ]);
@@ -266,7 +253,7 @@ export default function HistoryScreen() {
             <Ionicons name="list" size={22} color={selected ? Colors.primary : '#222222'} />
           </Pressable>
           <Ionicons name="search" size={22} color="#222222" />
-          <Pressable onPress={() => { setItemType(null); setMaterial('모르겠어요'); setTypeError(false); setOpenDropdown(null); setItemPickerVisible(true); }}>
+          <Pressable onPress={() => { setItemType(null); setTypeError(false); setOpenDropdown(null); setItemPickerVisible(true); }}>
             <Ionicons name="add" size={25} color="#222222" />
           </Pressable>
         </View>
@@ -406,29 +393,8 @@ export default function HistoryScreen() {
                 {openDropdown === 'type' && (
                   <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
                     {HISTORY_ITEM_TYPES.map((option) => (
-                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setMaterial('모르겠어요'); setTypeError(false); setOpenDropdown(null); }}>
+                      <Pressable key={option} style={[styles.dropdownOption, option === itemType && styles.dropdownOptionActive]} onPress={() => { setItemType(option); setTypeError(false); setOpenDropdown(null); }}>
                         <Text style={[styles.dropdownOptionText, option === itemType && styles.dropdownOptionTextActive]}>{option}</Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            </View>
-            <View style={[styles.settingRow, styles.materialSettingRow]}>
-              <View style={styles.settingLabelWrap}>
-                <Image source={require('../../../assets/images/item-material.svg')} style={styles.settingIcon} resizeMode="contain" />
-                <Text style={styles.settingLabel}>{itemType === '일반쓰레기' ? '세부 유형' : '재질'}</Text>
-              </View>
-              <View style={styles.selectWrap}>
-                <Pressable disabled={!itemType} style={[styles.selectBox, !itemType && styles.selectBoxDisabled, openDropdown === 'material' && styles.selectBoxOpen]} onPress={() => setOpenDropdown((value) => value === 'material' ? null : 'material')}>
-                  <Text numberOfLines={1} style={[styles.selectText, !itemType && styles.selectDisabledText]}>{itemType ? material : '종류를 먼저 선택해주세요'}</Text>
-                  <Ionicons name={openDropdown === 'material' ? 'chevron-up' : 'chevron-down'} size={16} color="#444444" />
-                </Pressable>
-                {openDropdown === 'material' && (
-                  <ScrollView style={styles.dropdownMenu} nestedScrollEnabled showsVerticalScrollIndicator={false}>
-                    {(itemType ? ['모르겠어요', ...MATERIAL_OPTIONS[itemType]] : []).map((option) => (
-                      <Pressable key={option} style={[styles.dropdownOption, option === material && styles.dropdownOptionActive]} onPress={() => { setMaterial(option); setOpenDropdown(null); }}>
-                        <Text style={[styles.dropdownOptionText, option === material && styles.dropdownOptionTextActive]}>{option}</Text>
                       </Pressable>
                     ))}
                   </ScrollView>
@@ -622,7 +588,6 @@ const styles = StyleSheet.create({
   },
   settingLabelWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   typeSettingRow: { zIndex: 4 },
-  materialSettingRow: { zIndex: 3 },
   settingIcon: { width: 20, height: 22 },
   settingLabel: { color: '#222222', fontSize: 15, lineHeight: 20, fontWeight: '700' },
   requiredMark: { color: '#22A162', fontWeight: '700' },
@@ -640,10 +605,8 @@ const styles = StyleSheet.create({
   selectWrap: { width: 170, position: 'relative' },
   selectBoxOpen: { borderColor: '#22A162' },
   selectBoxError: { borderColor: '#E5484D', borderWidth: 1.5 },
-  selectBoxDisabled: { backgroundColor: '#F5F5F5', borderColor: '#E1E1E1' },
   selectText: { flex: 1, marginRight: 6, color: '#555555', fontSize: 13, fontWeight: '500' },
   selectPlaceholder: { color: '#9CA3AF' },
-  selectDisabledText: { color: '#A9A9A9', fontSize: 11 },
   dropdownMenu: {
     position: 'absolute',
     top: 37,
