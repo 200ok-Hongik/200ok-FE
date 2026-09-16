@@ -10,7 +10,7 @@ export type CategoryInfo = {
   code: string;
   name: string;
   confidence: number;
-  source: string;
+  categorySource: string;
 };
 
 export type TrashCategory = {
@@ -54,8 +54,7 @@ export type ScanDetail = {
   states: ChecklistItem[];
   userResult: {
     decisionId: number;
-    categoryId: number;
-    source: string;
+    category: CategoryInfo;
     isPass: boolean;
     states: ChecklistItem[];
   } | null;

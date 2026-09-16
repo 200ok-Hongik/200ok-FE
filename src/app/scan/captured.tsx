@@ -10,19 +10,10 @@ import { Text } from '@/components/ui/Text';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { confirmScanResult, getScan, getTrashCategories, type ScanDetail, type TrashCategory } from '@/services/api';
 
-const MATERIAL_OPTIONS = {
-  '무색 페트병': ['PET'],
-  '플라스틱류': ['PET', 'HDPE', 'LDPE', 'PP', 'PS', 'OTHER'],
-  '캔류': ['알루미늄', '철'],
-  '유리병류': ['투명 유리', '갈색 유리', '녹색 유리', '기타'],
-  '비닐류': ['LDPE', 'HDPE', 'PP', 'OTHER'],
-  '종이류': ['일반 종이', '종이상자', '신문지', '책자·노트'],
-  '종이팩': ['일반팩(살균팩)', '멸균팩'],
-  '스티로폼류': ['포장용 스티로폼', '완충재', '식품 용기'],
-} as const;
+const ITEM_TYPES = ['무색 페트병', '플라스틱류', '캔류', '유리병류', '비닐류', '종이류', '종이팩', '스티로폼류'] as const;
 
-type ItemType = keyof typeof MATERIAL_OPTIONS;
-type PickerKind = 'type' | 'material' | 'separation' | null;
+type ItemType = (typeof ITEM_TYPES)[number];
+type PickerKind = 'type' | 'separation' | null;
 
 const TABS = [
   { label: '홈', icon: 'home-outline' as const, route: '/(tabs)' as const },
@@ -35,15 +26,6 @@ const TABS = [
 function stateIsTrue(scan: ScanDetail, key: string) {
   const state = scan.states.find((item) => item.checkItemName.toLowerCase() === key.toLowerCase());
   return ['true', 'yes', '1', 'y'].includes(String(state?.statusValue).toLowerCase());
-}
-
-function inferMaterial(code: string) {
-  const upper = code.toUpperCase();
-  if (upper.includes('PET')) return 'PET';
-  if (upper.includes('GLASS')) return '유리';
-  if (upper.includes('CAN') || upper.includes('ALUMINUM')) return '알루미늄';
-  if (upper.includes('PAPER')) return '종이';
-  return '모르겠어요';
 }
 
 function inferItemType(category: Pick<TrashCategory, 'code' | 'name'>): ItemType {
@@ -66,7 +48,6 @@ export default function ScanCapturedScreen() {
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<TrashCategory[]>([]);
   const [itemType, setItemType] = useState<ItemType>('플라스틱류');
-  const [material, setMaterial] = useState('PET');
   const [contaminated, setContaminated] = useState(false);
   const [separation, setSeparation] = useState<'완료' | '안 함' | '해당 없음'>('완료');
   const [picker, setPicker] = useState<PickerKind>(null);
@@ -83,7 +64,6 @@ export default function ScanCapturedScreen() {
         setScan(detail);
         setCategories(categoryList);
         setItemType(initialType);
-        setMaterial(MATERIAL_OPTIONS[initialType].includes(inferMaterial(detail.category.code) as never) ? inferMaterial(detail.category.code) : MATERIAL_OPTIONS[initialType][0]);
         setContaminated(initialContaminated);
         setSeparation(stateIsTrue(detail, 'hasLabel') || stateIsTrue(detail, 'hasCap') ? '안 함' : '완료');
       })
@@ -109,7 +89,7 @@ export default function ScanCapturedScreen() {
       await confirmScanResult(scan.scanId, {
         categoryId: selectedCategory?.categoryId ?? scan.category.categoryId,
         states,
-        comment: `재질: ${material}, 구성품 분리: ${separation}`,
+        comment: `구성품 분리: ${separation}`,
       });
       router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId) } });
     } catch (reason) {
@@ -137,7 +117,6 @@ export default function ScanCapturedScreen() {
 
           <View style={styles.settingsCard}>
             <SettingRow icon="water-outline" label="종류" value={itemType} selectable onPress={() => setPicker('type')} />
-            <SettingRow icon="layers-outline" label="재질" value={material} selectable onPress={() => setPicker('material')} />
             <View style={styles.settingRow}>
               <View style={styles.settingLabelWrap}><Ionicons name="water-outline" size={15} color={Colors.primaryDark} /><Text style={styles.settingLabel}>오염 상태</Text></View>
               <View style={styles.toggle}><Pressable onPress={() => setContaminated(false)} style={[styles.toggleItem, !contaminated && styles.toggleSelected]}><Text style={styles.toggleText}>깨끗함</Text></Pressable><Pressable onPress={() => setContaminated(true)} style={[styles.toggleItem, contaminated && styles.toggleSelected]}><Text style={styles.toggleText}>오염됨</Text></Pressable></View>
@@ -152,15 +131,13 @@ export default function ScanCapturedScreen() {
       </ScrollView>
 
       <View style={styles.tabBar}>{TABS.map((tab) => <Pressable key={tab.label} style={styles.tabItem} onPress={() => router.replace(tab.route)}><Ionicons name={tab.icon} size={19} color={tab.label === '스캔' ? Colors.primary : '#202725'} /><Text style={[styles.tabLabel, tab.label === '스캔' && styles.tabActive]}>{tab.label}</Text></Pressable>)}</View>
-      <BottomSheet visible={picker !== null} onClose={() => setPicker(null)} title={picker === 'type' ? '종류 선택' : picker === 'material' ? '재질 선택' : '구성품 분리'}>
-        {(picker === 'type' ? Object.keys(MATERIAL_OPTIONS) : picker === 'material' ? [...MATERIAL_OPTIONS[itemType]] : ['완료', '안 함', '해당 없음']).map((option) => (
+      <BottomSheet visible={picker !== null} onClose={() => setPicker(null)} title={picker === 'type' ? '종류 선택' : '구성품 분리'}>
+        {(picker === 'type' ? ITEM_TYPES : ['완료', '안 함', '해당 없음']).map((option) => (
           <Pressable key={option} style={styles.pickerOption} onPress={() => {
             if (picker === 'type') {
               const nextType = option as ItemType;
               setItemType(nextType);
-              setMaterial(MATERIAL_OPTIONS[nextType][0]);
-            } else if (picker === 'material') setMaterial(option);
-            else setSeparation(option as '완료' | '안 함' | '해당 없음');
+            } else setSeparation(option as '완료' | '안 함' | '해당 없음');
             setPicker(null);
           }}><Text style={styles.pickerOptionText}>{option}</Text></Pressable>
         ))}
