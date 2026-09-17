@@ -5,10 +5,9 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Text } from '@/components/ui/Text';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { DisposalGuideSteps, GuideCategories } from '@/constants/mockData';
+import { GuideCategories } from '@/constants/mockData';
 
 const CATEGORY_ART: Record<string, string> = {
   paper: '📰',
@@ -53,9 +52,7 @@ function getBannerTags(now = new Date()) {
 }
 
 export default function GuideScreen() {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const activeLabel = GuideCategories.find((category) => category.id === activeCategory)?.label;
   const categories = useMemo(
     () => GuideCategories.filter((category) => category.label.includes(query.trim())),
     [query]
@@ -108,7 +105,7 @@ export default function GuideScreen() {
               <Pressable
                 key={category.id}
                 style={({ pressed }) => [styles.categoryItem, pressed && styles.pressed]}
-                onPress={() => setActiveCategory(category.id)}>
+                onPress={() => router.push({ pathname: '/guide-detail' as never, params: { category: category.id } })}>
                 <Image
                   source={CATEGORY_ICON_SOURCES[category.id as keyof typeof CATEGORY_ICON_SOURCES]}
                   style={styles.categoryArt}
@@ -150,22 +147,6 @@ export default function GuideScreen() {
         </View>
       </ScrollView>
 
-      <BottomSheet
-        visible={!!activeCategory}
-        onClose={() => setActiveCategory(null)}
-        title={activeLabel ? `${activeLabel} 배출 가이드` : ''}>
-        {DisposalGuideSteps.map((step, index) => (
-          <View key={step.title} style={styles.stepRow}>
-            <View style={styles.stepDot}>
-              <Text style={styles.stepDotText}>{index + 1}</Text>
-            </View>
-            <View style={styles.stepCopy}>
-              <Text style={styles.stepTitle}>{step.title}</Text>
-              <Text style={styles.stepDesc}>{step.desc}</Text>
-            </View>
-          </View>
-        ))}
-      </BottomSheet>
     </SafeAreaView>
   );
 }
