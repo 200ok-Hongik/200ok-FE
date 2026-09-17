@@ -62,6 +62,7 @@ function getBannerTags(now = new Date()) {
 
 export default function GuideScreen() {
   const [query, setQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const normalizedQuery = query.trim().replace(/\s/g, '').toLowerCase();
   const categories = useMemo(() => {
     if (!normalizedQuery) return GuideCategories;
@@ -71,6 +72,7 @@ export default function GuideScreen() {
     });
   }, [normalizedQuery]);
   const bannerTags = useMemo(() => getBannerTags(), []);
+  const isSearchMode = isSearchFocused || normalizedQuery.length > 0;
   const openCategory = (categoryId: string) => {
     router.push({ pathname: '/guide-detail' as never, params: { category: categoryId } });
   };
@@ -90,12 +92,15 @@ export default function GuideScreen() {
               <TextInput
                 value={query}
                 onChangeText={setQuery}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
                 placeholder="찾고 싶은 분리배출법을 검색해보세요!"
                 placeholderTextColor="#38423E"
                 style={styles.searchInput}
                 returnKeyType="search"
                 clearButtonMode="while-editing"
                 onSubmitEditing={openFirstSearchResult}
+                autoCorrect={false}
               />
               <Pressable
                 hitSlop={10}
@@ -107,26 +112,38 @@ export default function GuideScreen() {
             </View>
           </View>
 
-          <View style={styles.heroRow}>
-            <View>
-              <Text style={styles.heroEyebrow}>올바른 분리배출을 위한</Text>
-              <Text style={styles.heroTitle}>내 손안의 분리배출</Text>
-            </View>
-            <Image
-              source={require('../../../assets/images/guide-recycle.png')}
-              style={styles.heroArt}
-              contentFit="contain"
-              cachePolicy="memory-disk"
-              transition={0}
-            />
-          </View>
-          <View style={styles.heroDots}>
-            <View style={styles.heroDotLong} />
-            <View style={styles.heroDot} />
-          </View>
+          {!isSearchMode && (
+            <>
+              <View style={styles.heroRow}>
+                <View>
+                  <Text style={styles.heroEyebrow}>올바른 분리배출을 위한</Text>
+                  <Text style={styles.heroTitle}>내 손안의 분리배출</Text>
+                </View>
+                <Image
+                  source={require('../../../assets/images/guide-recycle.png')}
+                  style={styles.heroArt}
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
+                  transition={0}
+                />
+              </View>
+              <View style={styles.heroDots}>
+                <View style={styles.heroDotLong} />
+                <View style={styles.heroDot} />
+              </View>
+            </>
+          )}
         </View>
 
-        <View style={styles.contentPanel}>
+        <View style={[styles.contentPanel, isSearchMode && styles.searchContentPanel]}>
+          {isSearchMode && (
+            <View style={styles.searchStatusRow}>
+              <Text style={styles.searchStatusTitle}>
+                {normalizedQuery ? `'${query.trim()}' 검색 결과` : '검색할 품목을 입력해주세요'}
+              </Text>
+              {!!normalizedQuery && <Text style={styles.searchCount}>{categories.length}개</Text>}
+            </View>
+          )}
           <View style={styles.categoryGrid}>
             {categories.map((category) => (
               <Pressable
@@ -148,7 +165,7 @@ export default function GuideScreen() {
             <Text style={styles.emptyText}>검색 결과가 없어요.</Text>
           )}
 
-          <Pressable
+          {!isSearchMode && <Pressable
             style={({ pressed }) => [styles.scanBanner, pressed && styles.pressed]}
             onPress={() => router.push('/scan/camera')}>
             <View style={styles.bannerCopy}>
@@ -170,7 +187,7 @@ export default function GuideScreen() {
               style={styles.bannerArt}
               contentFit="contain"
             />
-          </Pressable>
+          </Pressable>}
         </View>
       </ScrollView>
 
@@ -200,7 +217,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  searchInput: { flex: 1, height: '100%', color: '#20332B', fontSize: 12, fontFamily: 'PretendardRegular', padding: 0 },
+  searchInput: { flex: 1, height: '100%', color: '#20332B', fontSize: 16, fontFamily: 'PretendardRegular', padding: 0 },
   heroRow: {
     minHeight: 130,
     flexDirection: 'row',
@@ -232,6 +249,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 27,
     backgroundColor: '#FFFFFF',
   },
+  searchContentPanel: { minHeight: 560, paddingTop: 22 },
+  searchStatusRow: { minHeight: 35, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, paddingHorizontal: 4 },
+  searchStatusTitle: { color: '#17201C', fontSize: 16, lineHeight: 22, fontWeight: '700' },
+  searchCount: { color: Colors.primaryDark, fontSize: 14, lineHeight: 20, fontWeight: '700' },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 27 },
   categoryItem: { width: '33.333%', alignItems: 'center', gap: 6 },
   categoryArt: { width: 78, height: 58 },
