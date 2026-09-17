@@ -27,6 +27,15 @@ const CATEGORY_ICON_SOURCES = {
   styrofoam: require('../../../assets/images/guide-categories/styrofoam.svg'),
 };
 
+const CATEGORY_SEARCH_KEYWORDS: Record<string, string[]> = {
+  paper: ['종이', '박스', '종이상자', '신문', '책', '노트', '택배상자'],
+  can: ['캔', '고철', '알루미늄', '철', '음료캔', '통조림'],
+  glass: ['유리', '유리병', '소주병', '맥주병', '음료병'],
+  plastic: ['플라스틱', '페트', '페트병', 'pet', '용기', '무색페트병'],
+  vinyl: ['비닐', '봉투', '과자봉지', '포장지', '랩'],
+  styrofoam: ['스티로폼', '완충재', '포장용기', '식품용기'],
+};
+
 function getBannerTags(now = new Date()) {
   const hour = now.getHours();
   const day = now.getDay();
@@ -53,11 +62,21 @@ function getBannerTags(now = new Date()) {
 
 export default function GuideScreen() {
   const [query, setQuery] = useState('');
-  const categories = useMemo(
-    () => GuideCategories.filter((category) => category.label.includes(query.trim())),
-    [query]
-  );
+  const normalizedQuery = query.trim().replace(/\s/g, '').toLowerCase();
+  const categories = useMemo(() => {
+    if (!normalizedQuery) return GuideCategories;
+    return GuideCategories.filter((category) => {
+      const searchableWords = [category.label, ...(CATEGORY_SEARCH_KEYWORDS[category.id] ?? [])];
+      return searchableWords.some((word) => word.replace(/\s/g, '').toLowerCase().includes(normalizedQuery));
+    });
+  }, [normalizedQuery]);
   const bannerTags = useMemo(() => getBannerTags(), []);
+  const openCategory = (categoryId: string) => {
+    router.push({ pathname: '/guide-detail' as never, params: { category: categoryId } });
+  };
+  const openFirstSearchResult = () => {
+    if (categories[0]) openCategory(categories[0].id);
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -75,8 +94,16 @@ export default function GuideScreen() {
                 placeholderTextColor="#38423E"
                 style={styles.searchInput}
                 returnKeyType="search"
+                clearButtonMode="while-editing"
+                onSubmitEditing={openFirstSearchResult}
               />
-              <Ionicons name="search" size={24} color="#20332B" />
+              <Pressable
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="검색"
+                onPress={openFirstSearchResult}>
+                <Ionicons name="search" size={24} color="#20332B" />
+              </Pressable>
             </View>
           </View>
 
@@ -105,7 +132,7 @@ export default function GuideScreen() {
               <Pressable
                 key={category.id}
                 style={({ pressed }) => [styles.categoryItem, pressed && styles.pressed]}
-                onPress={() => router.push({ pathname: '/guide-detail' as never, params: { category: category.id } })}>
+                onPress={() => openCategory(category.id)}>
                 <Image
                   source={CATEGORY_ICON_SOURCES[category.id as keyof typeof CATEGORY_ICON_SOURCES]}
                   style={styles.categoryArt}
