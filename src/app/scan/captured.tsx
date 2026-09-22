@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { confirmScanResult, getScan, getTrashCategories, type ScanDetail, type TrashCategory } from '@/services/api';
+import { getScan, getTrashCategories, submitAnalysisFeedback, type ScanDetail, type TrashCategory } from '@/services/api';
 
 const ITEM_TYPES = ['무색 페트병', '플라스틱류', '캔류', '유리병류', '비닐류', '종이류', '종이팩', '스티로폼류'] as const;
 
@@ -88,10 +88,10 @@ export default function ScanCapturedScreen() {
         if (key === 'haslabel' || key === 'hascap') return { checklistId: state.checklistId, statusValue: String(separation === '안 함') };
         return { checklistId: state.checklistId, statusValue: state.statusValue };
       });
-      await confirmScanResult(scan.scanId, {
-        categoryId: selectedCategory?.categoryId ?? scan.category.categoryId,
-        states,
-        comment: `구성품 분리: ${separation}`,
+      await submitAnalysisFeedback({
+        scanResultId: scan.scanId,
+        categoryCode: selectedCategory?.code ?? scan.category.code,
+        checklistFeedbacks: states,
       });
       router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId) } });
     } catch (reason) {

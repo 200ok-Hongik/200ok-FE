@@ -78,6 +78,25 @@ export type ScanResultConfirmResponse = {
   decisionId: number;
 };
 
+export type AnalysisFeedbackRequest = {
+  scanResultId: number;
+  categoryCode: string;
+  checklistFeedbacks: { checklistId: number; statusValue: string }[];
+};
+
+export type AnalysisFeedbackResult = {
+  scanResultId: number;
+  decisionId: number;
+  isPass: boolean;
+  categoryName: string;
+  guideMessage: string;
+  steps: string[];
+  schedule: {
+    dischargeDays: string;
+    dischargeTime: string;
+  };
+};
+
 export type DisposalGuide = {
   decisionId: number;
   scanId: number;
@@ -202,7 +221,14 @@ async function request<T>(path: string, init?: RequestInit, canRetry = true): Pr
   }
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+  if (!text) return undefined as T;
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) return JSON.parse(text) as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return text as T;
+  }
 }
 
 function withUserId(path: string, params: Record<string, string> = {}) {
@@ -274,6 +300,25 @@ export async function uploadScan(
   }
 
   throw new Error('AI 분석 시간이 초과되었어요. 잠시 후 다시 시도해주세요.');
+}
+
+export async function checkAiServerHealth(): Promise<string> {
+  const health = await request<string>('/api/ai/server/health');
+  const normalized = String(health).toUpperCase();
+  if (normalized.includes('DOWN') || normalized.includes('UNHEALTHY') || normalized.includes('FAIL')) {
+    throw new Error('AI 분석 서버가 현재 준비되지 않았어요. 잠시 후 다시 시도해주세요.');
+  }
+  return health;
+}
+
+export async function submitAnalysisFeedback(
+  body: AnalysisFeedbackRequest
+): Promise<AnalysisFeedbackResult> {
+  return request<AnalysisFeedbackResult>('/api/ai/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
