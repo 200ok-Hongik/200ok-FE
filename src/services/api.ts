@@ -274,6 +274,7 @@ export async function uploadScan(
     method: 'POST',
     body: formData,
   });
+  console.info('[SSOK AI] 분석 접수 응답:', job);
   if (!job?.jobId) throw new Error('백엔드가 AI 작업 ID를 반환하지 않았어요.');
 
   const initialStatus = job.status?.toUpperCase() as AnalysisStatus;
@@ -287,6 +288,7 @@ export async function uploadScan(
   const deadline = Date.now() + 90000;
   while (Date.now() < deadline) {
     const current = await request<AnalysisJob>(`/api/ai/analysis/${encodeURIComponent(job.jobId)}`);
+    console.info('[SSOK AI] 분석 조회 응답:', current);
     const status = current.status?.toUpperCase() as AnalysisStatus;
     if (status) onStatusChange?.(status);
 
@@ -304,6 +306,7 @@ export async function uploadScan(
 
 export async function checkAiServerHealth(): Promise<string> {
   const health = await request<string>('/api/ai/server/health');
+  console.info('[SSOK AI] 서버 상태 응답:', health);
   const normalized = String(health).toUpperCase();
   if (normalized.includes('DOWN') || normalized.includes('UNHEALTHY') || normalized.includes('FAIL')) {
     throw new Error('AI 분석 서버가 현재 준비되지 않았어요. 잠시 후 다시 시도해주세요.');
@@ -314,11 +317,13 @@ export async function checkAiServerHealth(): Promise<string> {
 export async function submitAnalysisFeedback(
   body: AnalysisFeedbackRequest
 ): Promise<AnalysisFeedbackResult> {
-  return request<AnalysisFeedbackResult>('/api/ai/feedback', {
+  const result = await request<AnalysisFeedbackResult>('/api/ai/feedback', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  console.info('[SSOK AI] 결과 확정 응답:', result);
+  return result;
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {

@@ -88,11 +88,12 @@ export default function ScanCapturedScreen() {
         if (key === 'haslabel' || key === 'hascap') return { checklistId: state.checklistId, statusValue: String(separation === '안 함') };
         return { checklistId: state.checklistId, statusValue: state.statusValue };
       });
-      await submitAnalysisFeedback({
+      const feedbackResult = await submitAnalysisFeedback({
         scanResultId: scan.scanId,
         categoryCode: selectedCategory?.code ?? scan.category.code,
         checklistFeedbacks: states,
       });
+      console.info('[SSOK AI] 화면에서 받은 확정 결과:', feedbackResult);
       router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId) } });
     } catch (reason) {
       console.error(reason);
