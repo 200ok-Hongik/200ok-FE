@@ -217,6 +217,12 @@ async function request<T>(path: string, init?: RequestInit, canRetry = true): Pr
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
+    console.error('[SSOK API] 요청 실패:', {
+      method: init?.method ?? 'GET',
+      path,
+      status: response.status,
+      response: body,
+    });
     throw new Error(`SSOK API ${response.status} ${path}: ${body}`);
   }
   if (response.status === 204) return undefined as T;
@@ -342,6 +348,10 @@ export async function confirmScanResult(
   scanId: number,
   body: ScanResultConfirmRequest
 ): Promise<ScanResultConfirmResponse> {
+  console.info('[SSOK AI] 분석 결과 수정 및 확정 요청:', {
+    scanResultId: scanId,
+    body,
+  });
   const result = await request<ScanResultConfirmApiResponse>(`/api/scans/${scanId}/result`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
