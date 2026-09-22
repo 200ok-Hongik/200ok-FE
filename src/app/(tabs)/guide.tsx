@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -71,7 +71,11 @@ export default function GuideScreen() {
       return searchableWords.some((word) => word.replace(/\s/g, '').toLowerCase().includes(normalizedQuery));
     });
   }, [normalizedQuery]);
-  const bannerTags = useMemo(() => getBannerTags(), []);
+  const [bannerTags, setBannerTags] = useState(['#간편함', '#편리함', '#J형인간']);
+
+  useEffect(() => {
+    setBannerTags(getBannerTags());
+  }, []);
   const isSearchMode = isSearchFocused || normalizedQuery.length > 0;
   const openCategory = (categoryId: string) => {
     router.push({ pathname: '/guide-detail' as never, params: { category: categoryId } });

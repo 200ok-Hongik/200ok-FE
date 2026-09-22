@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,9 +14,15 @@ import { Colors } from '@/constants/theme';
 import { FRONTEND_URL, getProfile, KAKAO_LOGIN_URL } from '@/services/api';
 
 export default function OnboardingScreen() {
-  const now = new Date();
-  const displayTime = `${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`;
-  const displayPeriod = now.getHours() < 12 ? '오전' : '오후';
+  const [now, setNow] = useState<Date | null>(null);
+  const displayTime = now
+    ? `${now.getHours() % 12 || 12}:${String(now.getMinutes()).padStart(2, '0')}`
+    : '--:--';
+  const displayPeriod = now ? (now.getHours() < 12 ? '오전' : '오후') : '';
+
+  useEffect(() => {
+    setNow(new Date());
+  }, []);
   const handleKakaoLogin = async () => {
     if (Platform.OS === 'web') {
       window.location.assign(KAKAO_LOGIN_URL);

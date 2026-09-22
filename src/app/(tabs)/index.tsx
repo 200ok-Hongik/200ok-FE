@@ -49,9 +49,13 @@ export default function HomeScreen() {
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [monthlyRecycleCount, setMonthlyRecycleCount] = useState(0);
-  const today = new Date();
-  const weekday = WEEKDAYS[today.getDay()];
-  const currentMonth = today.getMonth() + 1;
+  const [today, setToday] = useState<Date | null>(null);
+  const weekday = today ? WEEKDAYS[today.getDay()] : '';
+  const currentMonth = today ? today.getMonth() + 1 : 0;
+
+  useEffect(() => {
+    setToday(new Date());
+  }, []);
 
   const handleFeedback = async (isAccurate: boolean) => {
     if (!scanId || isSubmittingFeedback) {
@@ -78,6 +82,7 @@ export default function HomeScreen() {
   }, [feedback]);
 
   useEffect(() => {
+    if (!today) return;
     let cancelled = false;
     const year = today.getFullYear();
     const month = today.getMonth();
@@ -96,7 +101,7 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [today]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

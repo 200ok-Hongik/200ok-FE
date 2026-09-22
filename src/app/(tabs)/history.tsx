@@ -134,7 +134,9 @@ function TrashDay({ count }: { count: number }) {
 }
 
 export default function HistoryScreen() {
-  const today = new Date();
+  // Keep the server render and the browser's first render identical. The real
+  // local date is applied after hydration below.
+  const [today, setToday] = useState(() => new Date(2000, 0, 1));
   const todayKey = toDateKey(today.getFullYear(), today.getMonth(), today.getDate());
   const [cursor, setCursor] = useState({ year: today.getFullYear(), month: today.getMonth() });
   const [selected, setSelected] = useState<string | null>(null);
@@ -153,6 +155,17 @@ export default function HistoryScreen() {
   const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>(
     HistoryEntries.map((entry, index) => ({ ...entry, id: `mock-${index}`, isCompleted: true }))
   );
+
+  useEffect(() => {
+    const localToday = new Date();
+    setToday(localToday);
+    setCursor({ year: localToday.getFullYear(), month: localToday.getMonth() });
+    setPendingDate({
+      year: localToday.getFullYear(),
+      month: localToday.getMonth() + 1,
+      day: localToday.getDate(),
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
