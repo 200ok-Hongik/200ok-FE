@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { checkAiServerHealth, uploadScan, type AnalysisStatus } from '@/services/api';
+import { uploadScan, type AnalysisStatus } from '@/services/api';
 
 const TAB_ICONS = [
   { name: 'home-outline' as const, label: '홈', route: '/(tabs)' as const },
@@ -62,8 +62,6 @@ export default function ScanCameraScreen() {
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
 
       await cameraRef.current.pausePreview();
-      setUploadStatus('AI 서버 연결을 확인하고 있어요…');
-      await checkAiServerHealth();
       setUploadStatus('사진을 분석하고 있어요…');
       const result = await uploadScan(photo.uri, (status: AnalysisStatus) => {
         if (status === 'QUEUED') setUploadStatus('AI 분석을 기다리고 있어요…');
