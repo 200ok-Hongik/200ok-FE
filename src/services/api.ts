@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://dev.ssok.store';
 export const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL ?? 'https://ssok.store';
 
@@ -46,6 +48,7 @@ export type AnalysisJob = {
 };
 
 export type ScanUploadResult = { scanResultId: number };
+export type AnalysisStatus = 'QUEUED' | 'ANALYZING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 export type ScanDetail = {
   scanId: number;
@@ -207,14 +210,31 @@ function withUserId(path: string, params: Record<string, string> = {}) {
   return `${path}?${query.toString()}`;
 }
 
-export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
+function completedScanResult(job: AnalysisJob): ScanUploadResult | null {
+  if (job.status?.toUpperCase() !== 'COMPLETED') return null;
+  const scanResultId = Number(job.result?.scanResultId);
+  if (!Number.isFinite(scanResultId) || scanResultId <= 0) {
+    throw new Error('완료된 분석에 스캔 결과 ID가 없어요.');
+  }
+  return { scanResultId };
+}
+
+export async function uploadScan(
+  imageUri: string,
+  onStatusChange?: (status: AnalysisStatus) => void
+): Promise<ScanUploadResult> {
   const formData = new FormData();
 
-  if (typeof window !== 'undefined') {
-    const dataUri = imageUri.startsWith('data:') ? imageUri : `data:image/jpeg;base64,${imageUri}`;
-    const imageResponse = await fetch(dataUri);
+  if (Platform.OS === 'web') {
+    const isFetchableUri = /^(data:|blob:|https?:\/\/)/i.test(imageUri);
+    const sourceUri = isFetchableUri ? imageUri : `data:image/jpeg;base64,${imageUri}`;
+    const imageResponse = await fetch(sourceUri);
+    if (!imageResponse.ok) throw new Error('촬영한 이미지를 불러오지 못했어요.');
     const imageBlob = await imageResponse.blob();
-    formData.append('image', imageBlob, 'scan.jpg');
+    const uploadBlob = imageBlob.type
+      ? imageBlob
+      : new Blob([imageBlob], { type: 'image/jpeg' });
+    formData.append('image', uploadBlob, 'scan.jpg');
   } else {
     formData.append('image', {
       uri: imageUri,
@@ -230,16 +250,22 @@ export async function uploadScan(imageUri: string): Promise<ScanUploadResult> {
   });
   if (!job?.jobId) throw new Error('백엔드가 AI 작업 ID를 반환하지 않았어요.');
 
+  const initialStatus = job.status?.toUpperCase() as AnalysisStatus;
+  if (initialStatus) onStatusChange?.(initialStatus);
+  const initialResult = completedScanResult(job);
+  if (initialResult) return initialResult;
+  if (initialStatus === 'FAILED') {
+    throw new Error(job.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.');
+  }
+
   const deadline = Date.now() + 90000;
   while (Date.now() < deadline) {
     const current = await request<AnalysisJob>(`/api/ai/analysis/${encodeURIComponent(job.jobId)}`);
-    const status = current.status?.toUpperCase();
+    const status = current.status?.toUpperCase() as AnalysisStatus;
+    if (status) onStatusChange?.(status);
 
-    if (status === 'COMPLETED') {
-      const scanResultId = current.result?.scanResultId;
-      if (!scanResultId) throw new Error('완료된 분석에 스캔 결과 ID가 없어요.');
-      return { scanResultId };
-    }
+    const result = completedScanResult(current);
+    if (result) return result;
     if (status === 'FAILED') {
       throw new Error(current.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.');
     }

@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { uploadScan } from '@/services/api';
+import { uploadScan, type AnalysisStatus } from '@/services/api';
 
 const TAB_ICONS = [
   { name: 'home-outline' as const, label: '홈', route: '/(tabs)' as const },
@@ -63,7 +63,11 @@ export default function ScanCameraScreen() {
 
       await cameraRef.current.pausePreview();
       setUploadStatus('사진을 분석하고 있어요…');
-      const result = await uploadScan(photo.uri);
+      const result = await uploadScan(photo.uri, (status: AnalysisStatus) => {
+        if (status === 'QUEUED') setUploadStatus('AI 분석을 기다리고 있어요…');
+        if (status === 'ANALYZING' || status === 'PROCESSING') setUploadStatus('AI가 사진을 분석하고 있어요…');
+        if (status === 'COMPLETED') setUploadStatus('분석 결과를 불러오고 있어요…');
+      });
       const resultScanId = result.scanResultId;
       if (!resultScanId) throw new Error('백엔드가 스캔 ID를 반환하지 않았어요.');
       router.push({ pathname: '/scan/captured', params: { scanId: String(resultScanId) } });
