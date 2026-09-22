@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { getScan, getTrashCategories, submitAnalysisFeedback, type ScanDetail, type TrashCategory } from '@/services/api';
+import { confirmScanResult, getScan, getTrashCategories, type ScanDetail, type TrashCategory } from '@/services/api';
 
 const ITEM_TYPES = ['무색 페트병', '플라스틱류', '캔류', '유리병류', '비닐류', '종이류', '종이팩', '스티로폼류'] as const;
 
@@ -88,12 +88,11 @@ export default function ScanCapturedScreen() {
         if (key === 'haslabel' || key === 'hascap') return { checklistId: state.checklistId, statusValue: String(separation === '안 함') };
         return { checklistId: state.checklistId, statusValue: state.statusValue };
       });
-      const feedbackResult = await submitAnalysisFeedback({
-        scanResultId: scan.scanId,
-        categoryCode: selectedCategory?.code ?? scan.category.code,
-        checklistFeedbacks: states,
+      const confirmedResult = await confirmScanResult(scan.scanId, {
+        categoryId: selectedCategory?.categoryId ?? scan.category.categoryId,
+        states,
       });
-      console.info('[SSOK AI] 화면에서 받은 확정 결과:', feedbackResult);
+      console.info('[SSOK AI] 분석 결과 수정 및 확정 응답:', confirmedResult);
       router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId) } });
     } catch (reason) {
       console.error(reason);
