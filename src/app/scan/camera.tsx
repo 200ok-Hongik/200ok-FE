@@ -55,6 +55,50 @@ async function maximizeWebCameraStream() {
   console.info('[SSOK Camera] 웹 카메라 스트림:', track.getSettings());
 }
 
+function captureWithSystemCamera(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    let settled = false;
+    const cleanup = () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      input.remove();
+    };
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const handleWindowFocus = () => {
+      window.setTimeout(() => {
+        if (!input.files?.length) {
+          finish(() => reject(new Error('사진 촬영을 취소했어요.')));
+        }
+      }, 1000);
+    };
+
+    input.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (!file) {
+        finish(() => reject(new Error('사진 촬영을 취소했어요.')));
+        return;
+      }
+      finish(() => resolve(URL.createObjectURL(file)));
+    });
+    input.addEventListener('cancel', () => {
+      finish(() => reject(new Error('사진 촬영을 취소했어요.')));
+    });
+    window.addEventListener('focus', handleWindowFocus);
+    input.click();
+  });
+}
+
 export default function ScanCameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isUploading, setIsUploading] = useState(false);
@@ -112,19 +156,18 @@ export default function ScanCameraScreen() {
     }
 
     let didCapturePhoto = false;
+    let webImageUrl: string | null = null;
     try {
       setCaptureError(null);
       setUploadStatus('사진을 촬영하고 있어요…');
       setIsUploading(true);
-      const photo = await cameraRef.current.takePictureAsync({
-        // Native에서는 Expo의 회전·리사이즈·재압축 단계를 건너뛰어
-        // 카메라 센서가 만든 원본 해상도와 디테일을 최대한 유지한다.
-        skipProcessing: Platform.OS !== 'web',
-        quality: Platform.OS === 'web' ? 1 : undefined,
-        base64: Platform.OS === 'web',
-        imageType: Platform.OS === 'web' ? 'jpg' : undefined,
-        scale: Platform.OS === 'web' ? 1 : undefined,
-      });
+      const photo = Platform.OS === 'web'
+        ? { uri: (webImageUrl = await captureWithSystemCamera()), width: undefined, height: undefined }
+        : await cameraRef.current.takePictureAsync({
+            // Expo의 회전·리사이즈·재압축 단계를 건너뛰어
+            // 카메라 센서가 만든 원본 해상도와 디테일을 최대한 유지한다.
+            skipProcessing: true,
+          });
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
       console.info('[SSOK Camera] 촬영 이미지:', {
         width: photo.width,
@@ -170,6 +213,7 @@ export default function ScanCameraScreen() {
       setCaptureError(message);
       Alert.alert(title, message);
     } finally {
+      if (webImageUrl) URL.revokeObjectURL(webImageUrl);
       setUploadStatus(null);
       setIsUploading(false);
     }
