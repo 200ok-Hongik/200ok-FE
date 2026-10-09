@@ -11,7 +11,7 @@ import { ScanSheet } from '@/components/scan/ScanSheet';
 import { SectionTitle, WarningIcon } from '@/components/scan/SectionTitle';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { Text } from '@/components/ui/Text';
-import { cardShadow, describeItem, ScanColors } from '@/constants/scanDesign';
+import { cardShadow, describeItem, ScanColors, statusBarInset } from '@/constants/scanDesign';
 import {
   getDisposalGuide,
   getObjectDisposalGuide,
@@ -101,7 +101,7 @@ export default function ScanResultScreen() {
     router.replace({ pathname: '/(tabs)', params: { feedback: '1', scanId: scanId ?? '' } });
   };
 
-  const headerTop = Math.max(insets.top, 44);
+  const headerTop = statusBarInset(insets.top);
   const header = (
     <View style={{ paddingTop: headerTop }}>
       <View style={styles.header}>

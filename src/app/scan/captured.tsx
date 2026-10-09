@@ -10,7 +10,7 @@ import { ScanSheet } from '@/components/scan/ScanSheet';
 import { ScanTabBar, useScanTabBarHeight } from '@/components/scan/ScanTabBar';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { Text } from '@/components/ui/Text';
-import { cardShadow, describeItem, ScanColors } from '@/constants/scanDesign';
+import { cardShadow, describeItem, ScanColors, statusBarInset } from '@/constants/scanDesign';
 import {
   confirmScanObjectResult,
   getScanObject,
@@ -172,6 +172,13 @@ export default function ScanCapturedScreen() {
     [categories, info.kind]
   );
 
+  // 같은 재질 이름(예: PET)이 여러 카테고리에 겹치면 서버가 준 카테고리 이름으로 구분해 보여준다.
+  const materialLabel = (category: Pick<TrashCategory, 'code' | 'name'>) => {
+    const base = describeItem(category.code, category.name).material;
+    const duplicated = materialOptions.filter((other) => describeItem(other.code, other.name).material === base).length > 1;
+    return duplicated ? category.name : base;
+  };
+
   const handleSelectKind = (kind: string) => {
     const next = categories.find((category) => describeItem(category.code, category.name).kind === kind);
     if (next) setCategoryId(next.categoryId);
@@ -203,7 +210,7 @@ export default function ScanCapturedScreen() {
   };
 
   const header = (
-    <View style={[styles.header, { top: Math.max(insets.top, 44) }]}>
+    <View style={[styles.header, { top: statusBarInset(insets.top) }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" hitSlop={12} onPress={() => router.back()} style={styles.back}>
         <PathIcon icon={ICONS.back} color="#FBFBFB" />
       </Pressable>
@@ -250,6 +257,7 @@ export default function ScanCapturedScreen() {
             <View style={[styles.photo, { backgroundColor: '#15231D' }]} />
           )}
           <LinearGradient colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0)']} style={styles.photoShade} />
+          {header}
         </View>
 
         <Text style={styles.eyebrow}>AI가 이 물건을</Text>
@@ -274,11 +282,11 @@ export default function ScanCapturedScreen() {
           <View style={[styles.row, styles.rowMaterial]}>
             <RowLabel icon={ICONS.rowMaterial} label="재질" />
             <SelectBox
-              value={info.material}
+              value={selectedCategory ? materialLabel(selectedCategory) : info.material}
               open={picker === 'material'}
               onPress={() => setPicker(picker === 'material' ? null : 'material')}
               options={(materialOptions.length > 0 ? materialOptions : []).map((category) => {
-                const label = describeItem(category.code, category.name).material;
+                const label = materialLabel(category);
                 return {
                   key: String(category.categoryId),
                   label,
@@ -328,7 +336,6 @@ export default function ScanCapturedScreen() {
         </Pressable>
       </ScrollView>
 
-      {header}
       <ScanTabBar variant="light" />
 
       <ScanSheet

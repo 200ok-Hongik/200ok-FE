@@ -35,6 +35,12 @@ export const cardShadow = Platform.select({
   },
 }) as object;
 
+// 상태바 아래에서 헤더가 시작하는 위치. 앱은 노치 높이(최소 44)를 비워 두지만,
+// 웹은 브라우저가 이미 상태바 영역을 따로 차지하므로 페이지가 알려주는 안전 영역만 쓴다.
+export function statusBarInset(safeAreaTop: number) {
+  return Platform.OS === 'web' ? safeAreaTop : Math.max(safeAreaTop, 44);
+}
+
 export type ItemGroup = 'plastic' | 'glass' | 'can' | 'paper' | 'vinyl' | 'styrofoam' | 'other';
 
 export type ItemInfo = {
