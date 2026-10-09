@@ -69,8 +69,6 @@ export default function ScanCameraScreen() {
   const [pictureSize, setPictureSize] = useState<string>();
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
-  // 임시 진단용: 웹 카메라가 실제로 몇 픽셀로 열렸는지 화면에 표시한다. 확인 후 삭제.
-  const [streamResolution, setStreamResolution] = useState<string | null>(null);
   const requestedRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
   const webCameraRef = useRef<WebCameraHandle>(null);
@@ -218,9 +216,8 @@ export default function ScanCameraScreen() {
       {isWeb ? (
         <WebCameraView
           ref={webCameraRef}
-          onReady={({ width, height }) => {
+          onReady={() => {
             setCaptureError(null);
-            setStreamResolution(`${width}×${height}`);
             setIsCameraReady(true);
           }}
           onError={(message) => {
@@ -267,9 +264,6 @@ export default function ScanCameraScreen() {
           </View>
 
           <Text style={styles.hint}>재활용품이 잘 보이도록 화면을 반듯하게 유지해주세요</Text>
-          {isWeb && streamResolution && (
-            <Text style={styles.resolutionBadge}>카메라 해상도 {streamResolution}</Text>
-          )}
           {captureError && <Text style={styles.captureError}>{captureError}</Text>}
           {uploadStatus && <Text style={styles.uploadStatus}>{uploadStatus}</Text>}
         </View>
@@ -373,17 +367,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     fontSize: FontSize.sm,
     marginTop: Spacing.md,
-  },
-  resolutionBadge: {
-    alignSelf: 'center',
-    marginTop: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    color: '#FFFFFF',
-    fontSize: FontSize.xs,
   },
   captureError: {
     marginTop: Spacing.sm,
