@@ -145,17 +145,23 @@ export default function ScanCameraScreen() {
 
     try {
       await maximizeWebCameraStream();
-      const sizes = await cameraRef.current.getAvailablePictureSizesAsync();
-      const largestSize = sizes.reduce<string | undefined>((largest, current) => {
-        const [width, height] = current.split('x').map(Number);
-        const [largestWidth = 0, largestHeight = 0] = (largest ?? '').split('x').map(Number);
-        const currentPixels = width * height;
-        const largestPixels = largestWidth * largestHeight;
 
-        return Number.isFinite(currentPixels) && currentPixels > largestPixels ? current : largest;
-      }, undefined);
+      // iOS는 기기 지원 여부와 상관없이 고정 프리셋 목록("3840x2160", "Photo" 등)을 돌려주고,
+      // "3840x2160"은 16:9 비디오 프리셋이라 기본 "Photo" 프리셋(12MP 사진 파이프라인)보다
+      // 오히려 화질이 떨어진다. iOS는 기본 Photo 프리셋을 그대로 쓰고, Android만 최대 크기를 고른다.
+      if (Platform.OS === 'android') {
+        const sizes = await cameraRef.current.getAvailablePictureSizesAsync();
+        const largestSize = sizes.reduce<string | undefined>((largest, current) => {
+          const [width, height] = current.split('x').map(Number);
+          const [largestWidth = 0, largestHeight = 0] = (largest ?? '').split('x').map(Number);
+          const currentPixels = width * height;
+          const largestPixels = largestWidth * largestHeight;
 
-      if (largestSize) setPictureSize(largestSize);
+          return Number.isFinite(currentPixels) && currentPixels > largestPixels ? current : largest;
+        }, undefined);
+
+        if (largestSize) setPictureSize(largestSize);
+      }
     } catch (error) {
       console.warn('[SSOK Camera] 지원 사진 크기를 확인하지 못했어요:', error);
     } finally {
@@ -185,8 +191,8 @@ export default function ScanCameraScreen() {
       const photo = Platform.OS === 'web'
         ? { uri: (webImageUrl = await captureWithSystemCamera()), width: undefined, height: undefined }
         : await cameraRef.current.takePictureAsync({
-            // Expo의 회전·리사이즈·재압축 단계를 건너뛰어
-            // 카메라 센서가 만든 원본 해상도와 디테일을 최대한 유지한다.
+            // 압축 손실을 최소화한다. (iOS 기본값도 1이지만 Android 등에서 명시적으로 고정)
+            quality: 1,
             skipProcessing: true,
           });
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
@@ -248,9 +254,11 @@ export default function ScanCameraScreen() {
           style={StyleSheet.absoluteFill}
           facing="back"
           mode="picture"
-          autofocus="on"
+          // expo-camera iOS: "on" = 한 번 초점을 맞추고 고정(.autoFocus), "off" = 연속 자동초점(.continuousAutoFocus).
+          // 이름이 반대로 보여도 움직이는 대상을 계속 선명하게 잡으려면 "off"여야 한다.
+          autofocus="off"
           zoom={0}
-          pictureSize={Platform.OS === 'web' ? undefined : pictureSize}
+          pictureSize={Platform.OS === 'android' ? pictureSize : undefined}
           onCameraReady={handleCameraReady}
           onMountError={(event) => {
             setIsCameraReady(false);
