@@ -1,92 +1,109 @@
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/Button';
-import { BottomSheet } from '@/components/ui/BottomSheet';
-import { Text } from '@/components/ui/Text';
+import { ICONS, type IconDef } from '@/components/scan/iconPaths';
+import { PathIcon } from '@/components/scan/PathIcon';
+import { ScanSheet } from '@/components/scan/ScanSheet';
+import { ScanTabBar, useScanTabBarHeight } from '@/components/scan/ScanTabBar';
 import { SsokLogo } from '@/components/ui/SsokLogo';
-import { getSeparationDescription } from '@/constants/separation';
-import { Colors, FontSize, Spacing } from '@/constants/theme';
+import { Text } from '@/components/ui/Text';
+import { cardShadow, describeItem, ScanColors } from '@/constants/scanDesign';
 import {
   confirmScanObjectResult,
   getScanObject,
+  getProfile,
   getScanObjects,
   getTrashCategories,
+  type ChecklistItem,
   type ScanDetail,
-  type ScanObjectSummary,
   type TrashCategory,
 } from '@/services/api';
 
-const ITEM_TYPES = ['무색 페트병', '플라스틱류', '캔류', '유리병류', '비닐류', '종이류', '종이팩', '스티로폼류'] as const;
+const PHOTO_HEIGHT = 476;
 
-type ItemType = (typeof ITEM_TYPES)[number];
-type PickerKind = 'type' | 'separation' | null;
+// 구성품 분리 시트의 칩. 서버 checkItemName이 정확히 무엇인지는 응답을 봐야 알 수 있어서 흔한 이름들을 함께 매칭한다.
+const COMPONENT_CHIPS = [
+  { key: 'transparent', label: '투명 여부', names: ['istransparent', 'transparent'] },
+  { key: 'label', label: '라벨 유무', names: ['haslabel', 'label'] },
+  { key: 'content', label: '내용물 비움 여부', names: ['isempty', 'hascontent', 'hascontents', 'hasliquid', 'hasresidue'] },
+  { key: 'dirty', label: '오염 여부', names: ['iscontaminated', 'contaminated'] },
+  { key: 'pressed', label: '압착 여부', names: ['iscompressed', 'iscrushed', 'compressed', 'ispressed'] },
+  { key: 'cap', label: '뚜껑 유무', names: ['hascap', 'cap'] },
+] as const;
 
-const TABS = [
-  { label: '홈', icon: 'home-outline' as const, route: '/(tabs)' as const },
-  { label: '기록', icon: 'time-outline' as const, route: '/(tabs)/history' as const },
-  { label: '스캔', icon: 'scan' as const, route: '/scan/camera' as const },
-  { label: '가이드', icon: 'bookmark-outline' as const, route: '/(tabs)/guide' as const },
-  { label: 'My', icon: 'person-outline' as const, route: '/(tabs)/mypage' as const },
-];
+type ChipKey = (typeof COMPONENT_CHIPS)[number]['key'];
+type Flags = Record<ChipKey, boolean>;
+type Picker = 'kind' | 'material' | 'component' | null;
 
-function stateIsTrue(scan: ScanDetail, key: string) {
-  const state = scan.states.find((item) => item.checkItemName.toLowerCase() === key.toLowerCase());
-  return ['true', 'yes', '1', 'y'].includes(String(state?.statusValue).toLowerCase());
+// 분리 안내 문구에 들어가는 칩 (선택돼 있으면 "분리 필요")
+const SEPARATION_KEYS: ChipKey[] = ['label', 'cap'];
+const SEPARATION_NAMES: Record<string, string> = { label: '라벨', cap: '뚜껑' };
+
+const FALLBACK_KINDS = ['플라스틱 용기', '유리병', '캔류', '종이류', '종이팩', '비닐류', '스티로폼'];
+
+function chipKeyFor(name: string): ChipKey | null {
+  const normalized = name.toLowerCase().replace(/[^a-z]/g, '');
+  const chip = COMPONENT_CHIPS.find((candidate) => (candidate.names as readonly string[]).includes(normalized));
+  return chip?.key ?? null;
 }
 
-function matchItemType(category: Pick<TrashCategory, 'code' | 'name'>): ItemType | null {
-  const value = `${category.code} ${category.name}`.toUpperCase();
-  if (value.includes('PET') && !value.includes('PLASTIC')) return '무색 페트병';
-  if (value.includes('VINYL') || value.includes('비닐')) return '비닐류';
-  if (value.includes('GLASS') || value.includes('유리')) return '유리병류';
-  if (value.includes('CAN') || value.includes('캔')) return '캔류';
-  if (value.includes('PAPER_PACK') || value.includes('종이팩')) return '종이팩';
-  if (value.includes('PAPER') || value.includes('종이')) return '종이류';
-  if (value.includes('STYRO') || value.includes('스티로폼')) return '스티로폼류';
-  if (value.includes('PLASTIC') || value.includes('플라스틱')) return '플라스틱류';
-  return null;
+function isTrue(value: unknown) {
+  return ['true', 'yes', '1', 'y'].includes(String(value).toLowerCase());
 }
 
-function inferItemType(category: Pick<TrashCategory, 'code' | 'name'>): ItemType {
-  return matchItemType(category) ?? '플라스틱류';
+function flagsFromStates(states: ChecklistItem[]): Flags {
+  const flags = Object.fromEntries(COMPONENT_CHIPS.map((chip) => [chip.key, false])) as Flags;
+  for (const state of states) {
+    const key = chipKeyFor(state.checkItemName);
+    if (key) flags[key] = isTrue(state.statusValue);
+  }
+  return flags;
 }
 
-// 객체 선택 칩에 표시할 이름. 알려진 품목이 아니면 서버가 준 itemCode를 그대로 보여준다.
-function objectLabel(object: ScanObjectSummary, index: number) {
-  const code = object.finalResult?.itemCode ?? '';
-  return `${index + 1}. ${matchItemType({ code, name: code }) ?? (code || '물건')}`;
+// "페트병 (PET)" + "으로" / "유리 (GLASS)" + "로" — 괄호 설명은 빼고 받침을 본다.
+function withParticle(text: string) {
+  const bare = text.replace(/\s*\([^)]*\)\s*$/, '');
+  const last = bare.charCodeAt(bare.length - 1);
+  if (last >= 0xac00 && last <= 0xd7a3) {
+    const finalConsonant = (last - 0xac00) % 28;
+    return finalConsonant === 0 || finalConsonant === 8 ? '로' : '으로';
+  }
+  return '으로';
 }
 
 export default function ScanCapturedScreen() {
-  const { scanId } = useLocalSearchParams<{ scanId?: string }>();
+  const { scanId, objectId: objectIdParam } = useLocalSearchParams<{ scanId?: string; objectId?: string }>();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useScanTabBarHeight();
+
+  const [objectId, setObjectId] = useState<string | null>(objectIdParam ?? null);
   const [scan, setScan] = useState<ScanDetail | null>(null);
-  const [objects, setObjects] = useState<ScanObjectSummary[]>([]);
-  const [objectId, setObjectId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<TrashCategory[]>([]);
+  const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [flags, setFlags] = useState<Flags | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<TrashCategory[]>([]);
-  const [itemType, setItemType] = useState<ItemType>('플라스틱류');
-  const [contaminated, setContaminated] = useState(false);
-  const [separation, setSeparation] = useState<'완료' | '안 함' | '해당 없음'>('완료');
-  const [picker, setPicker] = useState<PickerKind>(null);
+  const [picker, setPicker] = useState<Picker>(null);
+  const [gugun, setGugun] = useState<string | null>(null);
 
-  // 1) 분석된 객체 목록. 첫 번째 객체를 기본 선택한다.
+  // 시트 부제목에 쓰는 사용자 지역(구). 못 불러와도 화면은 그대로 동작한다.
   useEffect(() => {
-    if (!scanId) return;
+    getProfile()
+      .then((profile) => setGugun(profile.region?.gugun ?? null))
+      .catch(() => undefined);
+  }, []);
+
+  // objectId 없이 들어오면(예: 이전 링크) 첫 번째 물건을 사용한다.
+  useEffect(() => {
+    if (!scanId || objectId) return;
     let cancelled = false;
-    setIsLoading(true);
-    Promise.all([getScanObjects(Number(scanId)), getTrashCategories().catch(() => [])])
-      .then(([list, categoryList]) => {
+    getScanObjects(Number(scanId))
+      .then((list) => {
         if (cancelled) return;
-        console.info('[SSOK AI] 스캔 객체 목록:', list);
-        setCategories(categoryList);
-        setObjects(list.objects);
         if (list.objects.length === 0) {
           setError('사진에서 인식된 물건이 없어요.');
           setIsLoading(false);
@@ -100,44 +117,70 @@ export default function ScanCapturedScreen() {
         setError('스캔 결과를 불러오지 못했어요.');
         setIsLoading(false);
       });
-    return () => { cancelled = true; };
-  }, [scanId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [scanId, objectId]);
 
-  // 2) 선택한 객체의 상세. 객체를 바꾸면 해당 객체 값으로 폼을 다시 채운다.
   useEffect(() => {
     if (!scanId || !objectId) return;
     let cancelled = false;
-    setIsDetailLoading(true);
-    getScanObject(Number(scanId), objectId)
-      .then((detail) => {
+    setIsLoading(true);
+    Promise.all([getScanObject(Number(scanId), objectId), getTrashCategories().catch(() => [] as TrashCategory[])])
+      .then(([detail, categoryList]) => {
         if (cancelled) return;
+        console.info('[SSOK AI] 선택한 물건 상세:', detail);
         setScan(detail);
-        setItemType(inferItemType(detail.category));
-        setContaminated(stateIsTrue(detail, 'isContaminated'));
-        setSeparation(stateIsTrue(detail, 'hasLabel') || stateIsTrue(detail, 'hasCap') ? '안 함' : '완료');
+        setCategories(categoryList);
+        setCategoryId(detail.category.categoryId);
+        setFlags(flagsFromStates(detail.states));
+        const unmatched = detail.states.filter((state) => !chipKeyFor(state.checkItemName)).map((state) => state.checkItemName);
+        if (unmatched.length > 0) console.info('[SSOK AI] 구성품 칩과 연결되지 않은 상태 항목:', unmatched);
       })
       .catch((reason) => {
         console.error(reason);
         if (!cancelled) setError('선택한 물건의 결과를 불러오지 못했어요.');
       })
       .finally(() => {
-        if (cancelled) return;
-        setIsDetailLoading(false);
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [scanId, objectId]);
 
+  const selectedCategory = useMemo<Pick<TrashCategory, 'categoryId' | 'code' | 'name'> | null>(() => {
+    if (!scan) return null;
+    return categories.find((category) => category.categoryId === categoryId) ?? scan.category;
+  }, [categories, categoryId, scan]);
+
+  const info = describeItem(selectedCategory?.code, selectedCategory?.name);
+
+  const kindOptions = useMemo(() => {
+    if (categories.length === 0) return FALLBACK_KINDS;
+    return Array.from(new Set(categories.map((category) => describeItem(category.code, category.name).kind)));
+  }, [categories]);
+
+  const materialOptions = useMemo(
+    () => categories.filter((category) => describeItem(category.code, category.name).kind === info.kind),
+    [categories, info.kind]
+  );
+
+  const handleSelectKind = (kind: string) => {
+    const next = categories.find((category) => describeItem(category.code, category.name).kind === kind);
+    if (next) setCategoryId(next.categoryId);
+    setPicker(null);
+  };
+
+  const toggleFlag = (key: ChipKey) => setFlags((current) => (current ? { ...current, [key]: !current[key] } : current));
+
   const handleConfirm = async () => {
-    if (!scan || !objectId) return;
+    if (!scan || !objectId || !flags) return;
     try {
       setIsConfirming(true);
-      const selectedCategory = categories.find((category) => inferItemType(category) === itemType);
       const states = scan.states.map((state) => {
-        const key = state.checkItemName.toLowerCase();
-        if (key === 'iscontaminated') return { checklistId: state.checklistId, statusValue: String(contaminated) };
-        if (key === 'haslabel' || key === 'hascap') return { checklistId: state.checklistId, statusValue: String(separation === '안 함') };
-        return { checklistId: state.checklistId, statusValue: state.statusValue };
+        const key = chipKeyFor(state.checkItemName);
+        return { checklistId: state.checklistId, statusValue: key ? String(flags[key]) : state.statusValue };
       });
       const confirmedResult = await confirmScanObjectResult(scan.scanId, objectId, {
         categoryId: selectedCategory?.categoryId ?? scan.category.categoryId,
@@ -153,94 +196,286 @@ export default function ScanCapturedScreen() {
     }
   };
 
-  if (isLoading) return <SafeAreaView style={[styles.container, styles.centered]}><ActivityIndicator color={Colors.primary} size="large" /></SafeAreaView>;
-  if (error || !scan) return <SafeAreaView style={[styles.container, styles.centered]}><Text style={styles.errorText}>{error ?? '스캔 정보를 찾을 수 없어요.'}</Text><Pressable onPress={() => router.back()}><Text style={styles.backText}>카메라로 돌아가기</Text></Pressable></SafeAreaView>;
+  const header = (
+    <View style={[styles.header, { top: Math.max(insets.top, 44) }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" hitSlop={12} onPress={() => router.back()} style={styles.back}>
+        <PathIcon icon={ICONS.back} color="#FBFBFB" />
+      </Pressable>
+      <SsokLogo width={51} color="#FBFBFB" />
+    </View>
+  );
+
+  if (isLoading || error || !scan || !flags) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        {error ? (
+          <>
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable onPress={() => router.back()}>
+              <Text style={styles.backText}>카메라로 돌아가기</Text>
+            </Pressable>
+          </>
+        ) : (
+          <ActivityIndicator color={ScanColors.green} size="large" />
+        )}
+      </View>
+    );
+  }
+
+  const separation = SEPARATION_KEYS.filter((key) => flags[key]).map((key) => SEPARATION_NAMES[key]);
+  const separationText = separation.length > 0 ? `${separation.join(', ')} 분리 필요` : '분리 필요 없음';
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <View style={styles.photoArea}>
-          {scan.imageUrl ? <Image source={{ uri: scan.imageUrl }} style={styles.photoImage} resizeMode="cover" /> : <View style={[styles.photoImage, styles.photoFallback]}><Ionicons name="image-outline" size={44} color="#FFFFFF" /></View>}
-          <View style={styles.photoHeader}><Pressable hitSlop={12} onPress={() => router.back()}><Ionicons name="chevron-back" size={22} color="#FFFFFF" /></Pressable><SsokLogo width={49} color="#FFFFFF" /></View>
-        </View>
-
-        <View style={styles.resultPanel}>
-          {objects.length > 1 && (
-            <View style={styles.objectSection}>
-              <Text style={styles.objectTitle}>사진에서 {objects.length}개의 물건을 찾았어요. 확인할 물건을 선택해 주세요.</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.objectRow}>
-                {objects.map((object, index) => {
-                  const selected = object.objectId === objectId;
-                  return (
-                    <Pressable key={object.objectId} disabled={isConfirming} onPress={() => setObjectId(object.objectId)} style={[styles.objectChip, selected && styles.objectChipSelected]}>
-                      <Text style={[styles.objectChipText, selected && styles.objectChipTextSelected]}>{objectLabel(object, index)}</Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
+    <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + 30 }}>
+        <View style={[styles.photoWrap, cardShadow]}>
+          {scan.imageUrl ? (
+            <Image source={{ uri: scan.imageUrl }} style={styles.photo} resizeMode="cover" />
+          ) : (
+            <View style={[styles.photo, { backgroundColor: '#15231D' }]} />
           )}
-          {isDetailLoading ? <View style={styles.detailLoading}><ActivityIndicator color={Colors.primary} /></View> : <>
-          <Text style={styles.resultEyebrow}>AI가 이 물건을</Text>
-          <Text style={styles.resultText}><Text style={styles.resultAccent}>{scan.category.name}</Text>으로 인식했어요.</Text>
-
-          <View style={styles.settingsCard}>
-            <SettingRow icon="water-outline" label="종류" value={itemType} selectable onPress={() => setPicker('type')} />
-            <View style={styles.settingRow}>
-              <View style={styles.settingLabelWrap}><Ionicons name="water-outline" size={15} color={Colors.primaryDark} /><Text style={styles.settingLabel}>오염 상태</Text></View>
-              <View style={styles.toggle}><Pressable onPress={() => setContaminated(false)} style={[styles.toggleItem, !contaminated && styles.toggleSelected]}><Text style={styles.toggleText}>깨끗함</Text></Pressable><Pressable onPress={() => setContaminated(true)} style={[styles.toggleItem, contaminated && styles.toggleSelected]}><Text style={styles.toggleText}>오염됨</Text></Pressable></View>
-            </View>
-            <SettingRow icon="refresh-outline" label="구성품 분리" description={getSeparationDescription(itemType)} value={separation} arrow onPress={() => setPicker('separation')} />
-          </View>
-
-          <View style={styles.editNote}><Ionicons name="add-circle" size={15} color={Colors.primaryDark} /><Text style={styles.editNoteText}>인식 결과가 다르다면{`\n`}필요한 항목만 수정해 주세요.</Text></View>
-          <View style={styles.infoList}><InfoLine text="AI는 이미지 특징과 지역 기준을 바탕으로 분석합니다. 포장 상태나 재질 혼합 여부에 따라 일부 품목은 정확한 판단이 어려울 수 있습니다." /><InfoLine text="더 정확한 분리배출을 위해 최종 확인을 권장합니다. 사용자의 확인과 피드백은 AI 품질 개선에도 반영됩니다." /></View>
-          <Button label="배출 방법 확인하기" loading={isConfirming} onPress={handleConfirm} style={styles.confirmButton} />
-          </>}
+          <LinearGradient colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0)']} style={styles.photoShade} />
         </View>
+
+        <Text style={styles.eyebrow}>AI가 이 물건을</Text>
+        <Text style={styles.result}>
+          <Text style={styles.resultAccent}>{info.detail}</Text>
+          {withParticle(info.detail)} 인식했어요.
+        </Text>
+
+        <View style={[styles.card, cardShadow]}>
+          <View style={styles.row}>
+            <RowLabel icon={ICONS.rowType} label="종류" />
+            <SelectBox value={info.kind} onPress={() => setPicker('kind')} />
+          </View>
+          <View style={styles.row}>
+            <RowLabel icon={ICONS.rowMaterial} label="재질" />
+            <SelectBox value={info.material} onPress={() => setPicker('material')} />
+          </View>
+          <View style={styles.row}>
+            <RowLabel icon={ICONS.rowDrop} label="오염 상태" />
+            <View style={styles.toggle}>
+              <Pressable onPress={() => setFlags({ ...flags, dirty: false })} style={[styles.toggleItem, !flags.dirty && styles.toggleOn]}>
+                <Text style={styles.toggleText}>깨끗함</Text>
+              </Pressable>
+              <Pressable onPress={() => setFlags({ ...flags, dirty: true })} style={[styles.toggleItem, flags.dirty && styles.toggleOn]}>
+                <Text style={styles.toggleText}>오염됨</Text>
+              </Pressable>
+            </View>
+          </View>
+          <Pressable style={[styles.row, styles.rowLast]} onPress={() => setPicker('component')}>
+            <RowLabel icon={ICONS.rowRecycle} label="구성품 분리" />
+            <View style={styles.rowValue}>
+              <Text style={styles.rowValueText}>{separationText}</Text>
+              <PathIcon icon={ICONS.chevronRight} color={ScanColors.gray} />
+            </View>
+          </Pressable>
+        </View>
+
+        <View style={styles.note}>
+          <PathIcon icon={ICONS.plus} color={ScanColors.green} />
+          <Text style={styles.noteText}>{`인식 결과가 다르다면\n필요한 항목만 수정해 주세요.`}</Text>
+        </View>
+
+        <InfoLine text={`AI는 이미지 특징과 지역 기준을 바탕으로 분석합니다.\n포장 상태나 재질 혼합 여부에 따라 일부 품목은 정확한 판단이 어려울 수 있습니다.`} first />
+        <InfoLine text={`더 정확한 분리배출을 위해 최종 확인을 권장합니다.\n사용자의 확인과 피드백은 AI 품질 개선에도 반영됩니다.`} />
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={isConfirming}
+          onPress={handleConfirm}
+          style={({ pressed }) => [styles.button, pressed && { opacity: 0.85 }]}>
+          {isConfirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>배출 방법 확인하기</Text>}
+        </Pressable>
       </ScrollView>
 
-      <View style={styles.tabBar}>{TABS.map((tab) => <Pressable key={tab.label} style={styles.tabItem} onPress={() => router.replace(tab.route)}><Ionicons name={tab.icon} size={19} color={tab.label === '스캔' ? Colors.primary : '#202725'} /><Text style={[styles.tabLabel, tab.label === '스캔' && styles.tabActive]}>{tab.label}</Text></Pressable>)}</View>
-      <BottomSheet visible={picker !== null} onClose={() => setPicker(null)} title={picker === 'type' ? '종류 선택' : '구성품 분리'}>
-        {(picker === 'type' ? ITEM_TYPES : ['완료', '안 함', '해당 없음']).map((option) => (
-          <Pressable key={option} style={styles.pickerOption} onPress={() => {
-            if (picker === 'type') {
-              const nextType = option as ItemType;
-              setItemType(nextType);
-            } else setSeparation(option as '완료' | '안 함' | '해당 없음');
-            setPicker(null);
-          }}><Text style={styles.pickerOptionText}>{option}</Text></Pressable>
-        ))}
-      </BottomSheet>
-    </SafeAreaView>
+      {header}
+      <ScanTabBar variant="light" />
+
+      <ScanSheet
+        visible={picker === 'component'}
+        onClose={() => setPicker(null)}
+        title="구성품 분리"
+        subtitle={`${gugun ?? '우리 동네'}의 재활용품 구성품 분리 정보를 확인해보세요!`}>
+        <View style={styles.chips}>
+          {COMPONENT_CHIPS.map((chip) => {
+            const on = flags[chip.key];
+            return (
+              <Pressable key={chip.key} onPress={() => toggleFlag(chip.key)} style={[styles.chip, on && styles.chipOn]}>
+                <Text style={[styles.chipText, on && styles.chipTextOn]}>{chip.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </ScanSheet>
+
+      <ScanSheet
+        visible={picker === 'kind' || picker === 'material'}
+        onClose={() => setPicker(null)}
+        title={picker === 'kind' ? '종류 선택' : '재질 선택'}
+        subtitle="인식 결과가 다르다면 알맞은 항목을 골라주세요."
+        minHeight={300}>
+        <View style={styles.options}>
+          {picker === 'kind' &&
+            kindOptions.map((kind) => (
+              <Option key={kind} label={kind} selected={kind === info.kind} onPress={() => handleSelectKind(kind)} />
+            ))}
+          {picker === 'material' &&
+            (materialOptions.length > 0 ? materialOptions : []).map((category) => {
+              const label = describeItem(category.code, category.name).material;
+              return (
+                <Option
+                  key={category.categoryId}
+                  label={label}
+                  selected={category.categoryId === selectedCategory?.categoryId}
+                  onPress={() => {
+                    setCategoryId(category.categoryId);
+                    setPicker(null);
+                  }}
+                />
+              );
+            })}
+          {picker === 'material' && materialOptions.length === 0 && (
+            <Option label={info.material} selected onPress={() => setPicker(null)} />
+          )}
+        </View>
+      </ScanSheet>
+    </View>
   );
 }
 
-function SettingRow({ icon, label, description, value, selectable, arrow, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; description?: string; value: string; selectable?: boolean; arrow?: boolean; onPress?: () => void }) {
-  return <Pressable disabled={!onPress} onPress={onPress} style={styles.settingRow}><View style={styles.settingLabelWrap}><Ionicons name={icon} size={15} color={Colors.primaryDark} /><View style={styles.settingCopy}><Text style={styles.settingLabel}>{label}</Text>{description && <Text style={styles.settingDescription}>{description}</Text>}</View></View><View style={selectable ? styles.selectValue : styles.plainValue}><Text style={styles.settingValueText} numberOfLines={1}>{value}</Text>{(selectable || arrow) && <Ionicons name="chevron-forward" size={14} color="#545B58" />}</View></Pressable>;
+function RowLabel({ icon, label }: { icon: IconDef; label: string }) {
+  return (
+    <View style={styles.rowLabel}>
+      <View style={styles.rowIcon}>
+        <PathIcon icon={icon} color={ScanColors.greenText} />
+      </View>
+      <Text style={styles.rowLabelText}>{label}</Text>
+    </View>
+  );
 }
 
-function InfoLine({ text }: { text: string }) { return <View style={styles.infoRow}><Ionicons name="information-circle-outline" size={12} color={Colors.textSecondary} /><Text style={styles.infoText}>{text}</Text></View>; }
+function SelectBox({ value, onPress }: { value: string; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={styles.select}>
+      <Text style={styles.selectText} numberOfLines={1}>{value}</Text>
+      <PathIcon icon={ICONS.chevronDown} color={ScanColors.gray} />
+    </Pressable>
+  );
+}
+
+function InfoLine({ text, first }: { text: string; first?: boolean }) {
+  return (
+    <View style={[styles.info, { marginTop: first ? 24 : 14 }]}>
+      <View style={styles.infoIcon}>
+        <PathIcon icon={ICONS.info} color={ScanColors.gray} />
+      </View>
+      <Text style={styles.infoText}>{text}</Text>
+    </View>
+  );
+}
+
+function Option({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipOn]}>
+      <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' }, centered: { alignItems: 'center', justifyContent: 'center', padding: Spacing.xl }, scroll: { paddingBottom: 8 },
-  errorText: { fontSize: FontSize.md, color: Colors.textSecondary, textAlign: 'center' }, backText: { marginTop: 18, color: Colors.primaryDark, fontWeight: '700' },
-  photoArea: { height: 300, backgroundColor: '#15231D' }, photoImage: { width: '100%', height: '100%' }, photoFallback: { alignItems: 'center', justifyContent: 'center' },
-  photoHeader: { position: 'absolute', top: 18, left: 18, flexDirection: 'row', alignItems: 'center', gap: 8 }, logo: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  resultPanel: { marginTop: -18, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingTop: 24, paddingBottom: 14 },
-  resultEyebrow: { textAlign: 'center', fontSize: 12, color: Colors.text }, resultText: { marginTop: 4, textAlign: 'center', fontSize: 15, fontWeight: '600', color: Colors.text }, resultAccent: { color: Colors.primaryDark, fontWeight: '800' },
-  settingsCard: { marginTop: 18, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, overflow: 'hidden' },
-  settingRow: { minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: '#FFFFFF' },
-  settingLabelWrap: { flex: 1, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }, settingCopy: { flex: 1 }, settingLabel: { flexShrink: 1, fontSize: 12, fontWeight: '700', color: Colors.text }, settingDescription: { marginTop: 2, fontSize: 8, lineHeight: 11, color: Colors.textSecondary },
-  selectValue: { minWidth: 98, height: 30, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, borderWidth: 1, borderColor: Colors.border, borderRadius: 5 },
-  plainValue: { maxWidth: 170, flexDirection: 'row', alignItems: 'center', gap: 7 }, settingValueText: { flexShrink: 1, fontSize: 11, color: Colors.text },
-  toggle: { height: 30, flexDirection: 'row', borderWidth: 1, borderColor: Colors.border, borderRadius: 5, overflow: 'hidden' }, toggleItem: { minWidth: 54, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 }, toggleSelected: { backgroundColor: '#DDF7EA', borderColor: Colors.primaryDark, borderWidth: 1 }, toggleText: { fontSize: 10, color: Colors.text },
-  editNote: { marginTop: 16, padding: 14, borderRadius: 7, backgroundColor: '#E8F8F2', flexDirection: 'row', alignItems: 'center', gap: 12 }, editNoteText: { fontSize: 11, lineHeight: 17, color: Colors.textSecondary },
-  infoList: { marginTop: 14, gap: 10 }, infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 }, infoText: { flex: 1, fontSize: 9, lineHeight: 14, color: Colors.textSecondary },
-  confirmButton: { marginTop: 22, height: 46, borderRadius: 6 }, tabBar: { height: 62, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-  tabItem: { alignItems: 'center', gap: 3, minWidth: 48 }, tabLabel: { fontSize: 9, color: '#202725' }, tabActive: { color: Colors.primary, fontWeight: '700' },
-  objectSection: { marginBottom: 18 }, objectTitle: { fontSize: 12, fontWeight: '700', color: Colors.text }, objectRow: { gap: 8, paddingTop: 10 },
-  objectChip: { height: 34, paddingHorizontal: 14, borderRadius: 17, borderWidth: 1, borderColor: Colors.border, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }, objectChipSelected: { borderColor: Colors.primaryDark, backgroundColor: '#DDF7EA' },
-  objectChipText: { fontSize: 12, color: Colors.textSecondary }, objectChipTextSelected: { color: Colors.primaryDark, fontWeight: '700' }, detailLoading: { height: 220, alignItems: 'center', justifyContent: 'center' },
-  pickerOption: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: Colors.border }, pickerOptionText: { fontSize: 15, color: Colors.text },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  centered: { alignItems: 'center', justifyContent: 'center', padding: 24 },
+  errorText: { fontSize: 15, color: ScanColors.gray, textAlign: 'center' },
+  backText: { marginTop: 18, color: ScanColors.greenText, fontWeight: '700' },
+
+  header: { position: 'absolute', left: 0, right: 0, height: 56, flexDirection: 'row', alignItems: 'center', paddingLeft: 22 },
+  back: { marginRight: 15, height: 32, justifyContent: 'center' },
+
+  photoWrap: { height: PHOTO_HEIGHT, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: '#FFFFFF' },
+  photo: { width: '100%', height: '100%', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
+  photoShade: { position: 'absolute', top: 0, left: 0, right: 0, height: 130, pointerEvents: 'none' },
+
+  eyebrow: { marginTop: 40, textAlign: 'center', fontSize: 16, lineHeight: 24, fontWeight: '500', color: '#000000' },
+  result: { marginTop: 3, textAlign: 'center', fontSize: 18, lineHeight: 28, fontWeight: '600', color: '#000000' },
+  resultAccent: { color: ScanColors.greenText },
+
+  card: { marginTop: 21, marginHorizontal: 16, borderRadius: 8, backgroundColor: '#FFFFFF' },
+  row: {
+    height: 56,
+    paddingLeft: 26,
+    paddingRight: 15.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: ScanColors.line,
+  },
+  rowLast: { height: 57, borderBottomWidth: 0, paddingRight: 23 },
+  rowLabel: { flexDirection: 'row', alignItems: 'center' },
+  rowIcon: { width: 22, height: 24, marginRight: 4, alignItems: 'center', justifyContent: 'center' },
+  rowLabelText: { fontSize: 14, lineHeight: 18, fontWeight: '600', color: ScanColors.ink },
+  rowValue: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  rowValueText: { fontSize: 13, lineHeight: 18, color: ScanColors.ink },
+
+  select: {
+    width: 122,
+    height: 31,
+    paddingLeft: 10.5,
+    paddingRight: 7.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: ScanColors.border,
+    borderRadius: 3.5,
+    backgroundColor: '#FFFFFF',
+  },
+  selectText: { flex: 1, fontSize: 13, color: ScanColors.gray },
+  toggle: { width: 120, height: 32, flexDirection: 'row' },
+  toggleItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: ScanColors.border,
+    backgroundColor: '#FFFFFF',
+  },
+  toggleOn: { backgroundColor: ScanColors.mintChip, borderColor: '#1D8652', zIndex: 1 },
+  toggleText: { fontSize: 13, color: '#000000' },
+
+  note: {
+    marginTop: 28,
+    marginHorizontal: 16,
+    height: 72,
+    paddingLeft: 28,
+    borderRadius: 8,
+    backgroundColor: ScanColors.mint,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 21,
+  },
+  noteText: { flex: 1, fontSize: 15, lineHeight: 20, color: ScanColors.ink2 },
+
+  info: { marginHorizontal: 17, flexDirection: 'row', alignItems: 'flex-start' },
+  infoIcon: { width: 13, height: 17, marginRight: 5, alignItems: 'center', justifyContent: 'center' },
+  infoText: { flex: 1, fontSize: 13, lineHeight: 17, color: 'rgba(80,80,80,0.8)' },
+
+  button: {
+    marginTop: 52,
+    marginHorizontal: 16,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: ScanColors.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+
+  chips: { marginTop: 28, flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 9, paddingBottom: 24 },
+  options: { marginTop: 28, flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 9, paddingBottom: 24 },
+  chip: { height: 34, paddingHorizontal: 16, borderRadius: 17, backgroundColor: ScanColors.chipGray, alignItems: 'center', justifyContent: 'center' },
+  chipOn: { backgroundColor: ScanColors.green },
+  chipText: { fontSize: 14, fontWeight: '500', color: '#000000' },
+  chipTextOn: { color: '#FFFFFF' },
 });

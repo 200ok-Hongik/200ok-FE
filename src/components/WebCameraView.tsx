@@ -16,7 +16,8 @@ export type WebCameraHandle = {
 
 type Props = {
   ref?: Ref<WebCameraHandle>;
-  onReady?: (info: { width: number; height: number }) => void;
+  // mirrored: 화면(미리보기)만 좌우 반전된 상태. 촬영된 사진은 항상 원본 방향이다.
+  onReady?: (info: { width: number; height: number; mirrored: boolean }) => void;
   onError?: (message: string) => void;
 };
 
@@ -146,10 +147,12 @@ export function WebCameraView({ ref, onReady, onError }: Props) {
 
         const settings = track?.getSettings();
         console.info('[SSOK Camera] 웹 카메라 스트림:', settings);
-        setMirrored(settings?.facingMode !== 'environment');
+        const isMirrored = settings?.facingMode !== 'environment';
+        setMirrored(isMirrored);
         onReadyRef.current?.({
           width: video.videoWidth || settings?.width || 0,
           height: video.videoHeight || settings?.height || 0,
+          mirrored: isMirrored,
         });
       } catch (error) {
         if (cancelled) return;

@@ -7,6 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FeedbackModal } from '@/components/scan/FeedbackModal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { OverlayModal } from '@/components/ui/OverlayModal';
@@ -210,38 +211,7 @@ export default function HomeScreen() {
         </View>
       </OverlayModal>
 
-      <OverlayModal visible={feedbackVisible} animationType="fade">
-        <View style={styles.feedbackBackdrop}>
-          <View style={styles.feedbackCard}>
-            <View style={styles.feedbackHeartWrap}>
-              <Ionicons name="heart" size={30} color={Colors.primary} />
-            </View>
-            <Text style={styles.feedbackGreeting}>반가워요. 민정 님,</Text>
-            <Text style={styles.feedbackTitle}>오늘은 무엇을 버릴 예정인가요?</Text>
-
-            <View style={styles.feedbackDivider} />
-
-            <Text style={styles.feedbackQuestion}>AI 인식이 정확했나요?</Text>
-            <Text style={styles.feedbackSubtext}>소중한 피드백을 바탕으로{'\n'}AI의 정확도를 더욱 높여갈게요.</Text>
-
-            <View style={styles.feedbackButtons}>
-              <Button
-                label="맞았어요"
-                loading={isSubmittingFeedback}
-                style={styles.feedbackButtonFlex}
-                onPress={() => handleFeedback(true)}
-              />
-              <Button
-                label="틀렸어요"
-                variant="secondary"
-                disabled={isSubmittingFeedback}
-                style={styles.feedbackButtonFlex}
-                onPress={() => handleFeedback(false)}
-              />
-            </View>
-          </View>
-        </View>
-      </OverlayModal>
+      <FeedbackModal visible={feedbackVisible} loading={isSubmittingFeedback} onAnswer={handleFeedback} />
     </SafeAreaView>
   );
 }
@@ -463,44 +433,4 @@ const styles = StyleSheet.create({
   reminderScanTitle: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   reminderScanDesc: { color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 16, marginTop: 3 },
 
-  feedbackBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: Colors.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xl,
-  },
-  feedbackCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    alignItems: 'center',
-  },
-  feedbackHeartWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-  },
-  feedbackGreeting: { fontSize: FontSize.md, color: Colors.textSecondary, fontWeight: '600' },
-  feedbackTitle: { fontSize: FontSize.lg, color: Colors.text, fontWeight: '800', marginTop: 2 },
-  feedbackDivider: { height: 1, backgroundColor: Colors.border, width: '100%', marginVertical: Spacing.lg },
-  feedbackQuestion: { fontSize: FontSize.md, fontWeight: '800', color: Colors.text },
-  feedbackSubtext: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
-    lineHeight: 19,
-  },
-  feedbackButtons: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xl, width: '100%' },
-  feedbackButtonFlex: { flex: 1 },
 });
