@@ -358,7 +358,7 @@ export async function uploadScan(
     );
   }
 
-  const deadline = Date.now() + 90000;
+  const deadline = Date.now() + 180000;
   let consecutiveStatusErrors = 0;
   while (Date.now() < deadline) {
     let current: AnalysisJob;
