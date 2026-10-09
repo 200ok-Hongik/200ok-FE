@@ -17,13 +17,27 @@ const TAB_ICONS = [
   { name: 'person-outline' as const, label: 'My', route: '/(tabs)/mypage' as const },
 ];
 
+async function getWebCameraTrack(timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const videos = Array.from(document.querySelectorAll('video'));
+    for (const video of videos) {
+      const stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
+      const track = stream?.getVideoTracks()[0];
+      if (track) return track;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+  }
+
+  return null;
+}
+
 async function maximizeWebCameraStream() {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
 
-  const video = document.querySelector('video');
-  const stream = video?.srcObject instanceof MediaStream ? video.srcObject : null;
-  const track = stream?.getVideoTracks()[0];
-  if (!track) return;
+  const track = await getWebCameraTrack();
+  if (!track) throw new Error('웹 카메라 영상 스트림을 찾지 못했어요.');
 
   const capabilities = track.getCapabilities?.();
   const maxWidth = capabilities?.width?.max ?? 3840;
@@ -31,8 +45,8 @@ async function maximizeWebCameraStream() {
 
   try {
     await track.applyConstraints({
-      width: { ideal: Math.min(maxWidth, 3840) },
-      height: { ideal: Math.min(maxHeight, 2160) },
+      width: { min: Math.min(1280, maxWidth), ideal: Math.min(maxWidth, 3840) },
+      height: { min: Math.min(720, maxHeight), ideal: Math.min(maxHeight, 2160) },
       frameRate: { ideal: 30 },
     });
   } catch (error) {
@@ -52,7 +66,14 @@ async function maximizeWebCameraStream() {
       .catch(() => undefined);
   }
 
-  console.info('[SSOK Camera] 웹 카메라 스트림:', track.getSettings());
+  const settings = track.getSettings();
+  console.info('[SSOK Camera] 웹 카메라 스트림:', settings);
+
+  if ((settings.width ?? 0) < 1280 || (settings.height ?? 0) < 720) {
+    throw new Error(
+      `브라우저가 고해상도 카메라를 허용하지 않았어요. (${settings.width ?? 0}x${settings.height ?? 0})`
+    );
+  }
 }
 
 function captureWithSystemCamera(): Promise<string> {
