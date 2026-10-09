@@ -10,7 +10,15 @@ import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { confirmScanResult, getScan, getTrashCategories, type ScanDetail, type TrashCategory } from '@/services/api';
+import {
+  confirmScanObjectResult,
+  getScanObject,
+  getScanObjects,
+  getTrashCategories,
+  type ScanDetail,
+  type ScanObjectSummary,
+  type TrashCategory,
+} from '@/services/api';
 
 const ITEM_TYPES = ['무색 페트병', '플라스틱류', '캔류', '유리병류', '비닐류', '종이류', '종이팩', '스티로폼류'] as const;
 
@@ -30,7 +38,7 @@ function stateIsTrue(scan: ScanDetail, key: string) {
   return ['true', 'yes', '1', 'y'].includes(String(state?.statusValue).toLowerCase());
 }
 
-function inferItemType(category: Pick<TrashCategory, 'code' | 'name'>): ItemType {
+function matchItemType(category: Pick<TrashCategory, 'code' | 'name'>): ItemType | null {
   const value = `${category.code} ${category.name}`.toUpperCase();
   if (value.includes('PET') && !value.includes('PLASTIC')) return '무색 페트병';
   if (value.includes('VINYL') || value.includes('비닐')) return '비닐류';
@@ -39,13 +47,27 @@ function inferItemType(category: Pick<TrashCategory, 'code' | 'name'>): ItemType
   if (value.includes('PAPER_PACK') || value.includes('종이팩')) return '종이팩';
   if (value.includes('PAPER') || value.includes('종이')) return '종이류';
   if (value.includes('STYRO') || value.includes('스티로폼')) return '스티로폼류';
-  return '플라스틱류';
+  if (value.includes('PLASTIC') || value.includes('플라스틱')) return '플라스틱류';
+  return null;
+}
+
+function inferItemType(category: Pick<TrashCategory, 'code' | 'name'>): ItemType {
+  return matchItemType(category) ?? '플라스틱류';
+}
+
+// 객체 선택 칩에 표시할 이름. 알려진 품목이 아니면 서버가 준 itemCode를 그대로 보여준다.
+function objectLabel(object: ScanObjectSummary, index: number) {
+  const code = object.finalResult?.itemCode ?? '';
+  return `${index + 1}. ${matchItemType({ code, name: code }) ?? (code || '물건')}`;
 }
 
 export default function ScanCapturedScreen() {
   const { scanId } = useLocalSearchParams<{ scanId?: string }>();
   const [scan, setScan] = useState<ScanDetail | null>(null);
+  const [objects, setObjects] = useState<ScanObjectSummary[]>([]);
+  const [objectId, setObjectId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<TrashCategory[]>([]);
@@ -54,31 +76,60 @@ export default function ScanCapturedScreen() {
   const [separation, setSeparation] = useState<'완료' | '안 함' | '해당 없음'>('완료');
   const [picker, setPicker] = useState<PickerKind>(null);
 
+  // 1) 분석된 객체 목록. 첫 번째 객체를 기본 선택한다.
   useEffect(() => {
     if (!scanId) return;
     let cancelled = false;
     setIsLoading(true);
-    Promise.all([getScan(Number(scanId)), getTrashCategories().catch(() => [])])
-      .then(([detail, categoryList]) => {
+    Promise.all([getScanObjects(Number(scanId)), getTrashCategories().catch(() => [])])
+      .then(([list, categoryList]) => {
         if (cancelled) return;
-        const initialType = inferItemType(detail.category);
-        const initialContaminated = stateIsTrue(detail, 'isContaminated');
-        setScan(detail);
+        console.info('[SSOK AI] 스캔 객체 목록:', list);
         setCategories(categoryList);
-        setItemType(initialType);
-        setContaminated(initialContaminated);
+        setObjects(list.objects);
+        if (list.objects.length === 0) {
+          setError('사진에서 인식된 물건이 없어요.');
+          setIsLoading(false);
+          return;
+        }
+        setObjectId(list.objects[0].objectId);
+      })
+      .catch((reason) => {
+        console.error(reason);
+        if (cancelled) return;
+        setError('스캔 결과를 불러오지 못했어요.');
+        setIsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [scanId]);
+
+  // 2) 선택한 객체의 상세. 객체를 바꾸면 해당 객체 값으로 폼을 다시 채운다.
+  useEffect(() => {
+    if (!scanId || !objectId) return;
+    let cancelled = false;
+    setIsDetailLoading(true);
+    getScanObject(Number(scanId), objectId)
+      .then((detail) => {
+        if (cancelled) return;
+        setScan(detail);
+        setItemType(inferItemType(detail.category));
+        setContaminated(stateIsTrue(detail, 'isContaminated'));
         setSeparation(stateIsTrue(detail, 'hasLabel') || stateIsTrue(detail, 'hasCap') ? '안 함' : '완료');
       })
       .catch((reason) => {
         console.error(reason);
-        if (!cancelled) setError('스캔 결과를 불러오지 못했어요.');
+        if (!cancelled) setError('선택한 물건의 결과를 불러오지 못했어요.');
       })
-      .finally(() => !cancelled && setIsLoading(false));
+      .finally(() => {
+        if (cancelled) return;
+        setIsDetailLoading(false);
+        setIsLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [scanId]);
+  }, [scanId, objectId]);
 
   const handleConfirm = async () => {
-    if (!scan) return;
+    if (!scan || !objectId) return;
     try {
       setIsConfirming(true);
       const selectedCategory = categories.find((category) => inferItemType(category) === itemType);
@@ -88,12 +139,12 @@ export default function ScanCapturedScreen() {
         if (key === 'haslabel' || key === 'hascap') return { checklistId: state.checklistId, statusValue: String(separation === '안 함') };
         return { checklistId: state.checklistId, statusValue: state.statusValue };
       });
-      const confirmedResult = await confirmScanResult(scan.scanId, {
+      const confirmedResult = await confirmScanObjectResult(scan.scanId, objectId, {
         categoryId: selectedCategory?.categoryId ?? scan.category.categoryId,
         states,
       });
       console.info('[SSOK AI] 분석 결과 수정 및 확정 응답:', confirmedResult);
-      router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId) } });
+      router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId), objectId } });
     } catch (reason) {
       console.error(reason);
       setError('결과를 확정하지 못했어요. 다시 시도해주세요.');
@@ -114,6 +165,22 @@ export default function ScanCapturedScreen() {
         </View>
 
         <View style={styles.resultPanel}>
+          {objects.length > 1 && (
+            <View style={styles.objectSection}>
+              <Text style={styles.objectTitle}>사진에서 {objects.length}개의 물건을 찾았어요. 확인할 물건을 선택해 주세요.</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.objectRow}>
+                {objects.map((object, index) => {
+                  const selected = object.objectId === objectId;
+                  return (
+                    <Pressable key={object.objectId} disabled={isConfirming} onPress={() => setObjectId(object.objectId)} style={[styles.objectChip, selected && styles.objectChipSelected]}>
+                      <Text style={[styles.objectChipText, selected && styles.objectChipTextSelected]}>{objectLabel(object, index)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+          {isDetailLoading ? <View style={styles.detailLoading}><ActivityIndicator color={Colors.primary} /></View> : <>
           <Text style={styles.resultEyebrow}>AI가 이 물건을</Text>
           <Text style={styles.resultText}><Text style={styles.resultAccent}>{scan.category.name}</Text>으로 인식했어요.</Text>
 
@@ -129,6 +196,7 @@ export default function ScanCapturedScreen() {
           <View style={styles.editNote}><Ionicons name="add-circle" size={15} color={Colors.primaryDark} /><Text style={styles.editNoteText}>인식 결과가 다르다면{`\n`}필요한 항목만 수정해 주세요.</Text></View>
           <View style={styles.infoList}><InfoLine text="AI는 이미지 특징과 지역 기준을 바탕으로 분석합니다. 포장 상태나 재질 혼합 여부에 따라 일부 품목은 정확한 판단이 어려울 수 있습니다." /><InfoLine text="더 정확한 분리배출을 위해 최종 확인을 권장합니다. 사용자의 확인과 피드백은 AI 품질 개선에도 반영됩니다." /></View>
           <Button label="배출 방법 확인하기" loading={isConfirming} onPress={handleConfirm} style={styles.confirmButton} />
+          </>}
         </View>
       </ScrollView>
 
@@ -171,5 +239,8 @@ const styles = StyleSheet.create({
   infoList: { marginTop: 14, gap: 10 }, infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 7 }, infoText: { flex: 1, fontSize: 9, lineHeight: 14, color: Colors.textSecondary },
   confirmButton: { marginTop: 22, height: 46, borderRadius: 6 }, tabBar: { height: 62, borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   tabItem: { alignItems: 'center', gap: 3, minWidth: 48 }, tabLabel: { fontSize: 9, color: '#202725' }, tabActive: { color: Colors.primary, fontWeight: '700' },
+  objectSection: { marginBottom: 18 }, objectTitle: { fontSize: 12, fontWeight: '700', color: Colors.text }, objectRow: { gap: 8, paddingTop: 10 },
+  objectChip: { height: 34, paddingHorizontal: 14, borderRadius: 17, borderWidth: 1, borderColor: Colors.border, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }, objectChipSelected: { borderColor: Colors.primaryDark, backgroundColor: '#DDF7EA' },
+  objectChipText: { fontSize: 12, color: Colors.textSecondary }, objectChipTextSelected: { color: Colors.primaryDark, fontWeight: '700' }, detailLoading: { height: 220, alignItems: 'center', justifyContent: 'center' },
   pickerOption: { minHeight: 48, justifyContent: 'center', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: Colors.border }, pickerOptionText: { fontSize: 15, color: Colors.text },
 });

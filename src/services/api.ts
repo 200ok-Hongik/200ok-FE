@@ -153,6 +153,31 @@ type DisposalGuideApiResponse = Omit<DisposalGuide, 'scanId'> & {
   scanResultId: number;
 };
 
+// 다중 객체 분석: 사진 한 장에서 인식된 물건들. 스웨거에 타입이 정의되지 않은 필드
+// (states, review, additionalObjects)는 실제 응답을 확인하기 전까지 느슨하게 둔다.
+export type ScanObjectSummary = {
+  objectId: string;
+  bbox: { xMin: number; yMin: number; xMax: number; yMax: number };
+  finalResult: {
+    itemCode: string;
+    states: Record<string, unknown>;
+    source: string;
+  };
+  vlm?: {
+    itemCode: string;
+    states: Record<string, unknown>;
+    confidence: number;
+  };
+  review?: Record<string, unknown>;
+};
+
+export type ScanObjectList = {
+  scanResultId: number;
+  objects: ScanObjectSummary[];
+  // 참고용 후보 목록. 객체별 확정 API 대상이 아니다.
+  additionalObjects: Record<string, unknown>[];
+};
+
 export type Region = {
   regionId: number;
   regionCode: string;
@@ -402,7 +427,10 @@ export async function submitAnalysisFeedback(
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
-  const result = await request<ScanDetailApiResponse>(`/api/scans/${scanId}`);
+  return toScanDetail(await request<ScanDetailApiResponse>(`/api/scans/${scanId}`));
+}
+
+function toScanDetail(result: ScanDetailApiResponse): ScanDetail {
   return {
     scanId: result.scanResultId,
     imageUrl: result.imageUrl,
@@ -411,6 +439,44 @@ export async function getScan(scanId: number): Promise<ScanDetail> {
     userResult: result.confirmedResult,
     createdAt: result.createdAt,
   };
+}
+
+// 다중 객체 결과에서는 기존 getScan / confirmScanResult / getDisposalGuide(scanId 단독)가
+// 400을 반환하므로, 아래 객체 단위 API를 사용한다.
+export async function getScanObjects(scanId: number): Promise<ScanObjectList> {
+  const result = await request<ScanObjectList>(`/api/scans/${scanId}/objects`);
+  return { ...result, objects: result.objects ?? [], additionalObjects: result.additionalObjects ?? [] };
+}
+
+export async function getScanObject(scanId: number, objectId: string): Promise<ScanDetail> {
+  const result = await request<ScanDetailApiResponse>(
+    `/api/scans/${scanId}/objects/${encodeURIComponent(objectId)}`
+  );
+  return toScanDetail(result);
+}
+
+export async function confirmScanObjectResult(
+  scanId: number,
+  objectId: string,
+  body: ScanResultConfirmRequest
+): Promise<ScanResultConfirmResponse> {
+  console.info('[SSOK AI] 객체 분석 결과 수정 및 확정 요청:', { scanResultId: scanId, objectId, body });
+  const result = await request<ScanResultConfirmApiResponse>(
+    `/api/scans/${scanId}/objects/${encodeURIComponent(objectId)}/result`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }
+  );
+  return { ...result, scanId: result.scanResultId };
+}
+
+export async function getObjectDisposalGuide(scanId: number, objectId: string): Promise<DisposalGuide> {
+  const result = await request<DisposalGuideApiResponse>(
+    `/api/scans/${scanId}/objects/${encodeURIComponent(objectId)}/disposal-guide`
+  );
+  return { ...result, scanId: result.scanResultId };
 }
 
 export async function confirmScanResult(

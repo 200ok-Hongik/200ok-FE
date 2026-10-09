@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/Button';
 import { ScreenHeader } from '@/components/ui/ScreenHeader';
 import { TopTabs } from '@/components/ui/TopTabs';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { getDisposalGuide, type DisposalGuide } from '@/services/api';
+import { getDisposalGuide, getObjectDisposalGuide, type DisposalGuide } from '@/services/api';
 
 export default function ScanResultScreen() {
-  const { scanId } = useLocalSearchParams<{ scanId?: string }>();
+  const { scanId, objectId } = useLocalSearchParams<{ scanId?: string; objectId?: string }>();
   const [guide, setGuide] = useState<DisposalGuide | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +26,8 @@ export default function ScanResultScreen() {
     let cancelled = false;
 
     setIsLoading(true);
-    getDisposalGuide(Number(scanId))
+    // 다중 객체 결과는 객체별 가이드를, objectId 없이 들어온 경우만 기존 단일 조회를 사용한다.
+    (objectId ? getObjectDisposalGuide(Number(scanId), objectId) : getDisposalGuide(Number(scanId)))
       .then((data) => {
         if (!cancelled) setGuide(data);
       })
@@ -41,7 +42,7 @@ export default function ScanResultScreen() {
     return () => {
       cancelled = true;
     };
-  }, [scanId]);
+  }, [scanId, objectId]);
 
   const handleSave = () => {
     router.replace({ pathname: '/(tabs)', params: { feedback: '1', scanId: scanId ?? '' } });
