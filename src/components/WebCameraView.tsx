@@ -1,4 +1,4 @@
-import { createElement, useEffect, useImperativeHandle, useRef, type Ref } from 'react';
+import { createElement, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 // 웹 전용 카메라. expo-camera의 웹 구현은 getUserMedia에 해상도를 지정하지 않아서
@@ -82,6 +82,9 @@ async function tuneTrack(track: MediaStreamTrack) {
 export function WebCameraView({ ref, onReady, onError }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // 전면 카메라(노트북 웹캠·셀카)는 거울처럼 보여주는 게 자연스럽다. 후면 카메라는 그대로 보여준다.
+  // 화면(CSS)만 뒤집고, 촬영해서 서버로 보내는 사진은 항상 원본 방향이다.
+  const [mirrored, setMirrored] = useState(false);
   const onReadyRef = useRef(onReady);
   const onErrorRef = useRef(onError);
   onReadyRef.current = onReady;
@@ -143,6 +146,7 @@ export function WebCameraView({ ref, onReady, onError }: Props) {
 
         const settings = track?.getSettings();
         console.info('[SSOK Camera] 웹 카메라 스트림:', settings);
+        setMirrored(settings?.facingMode !== 'environment');
         onReadyRef.current?.({
           width: video.videoWidth || settings?.width || 0,
           height: video.videoHeight || settings?.height || 0,
@@ -183,6 +187,7 @@ export function WebCameraView({ ref, onReady, onError }: Props) {
           objectFit: 'cover',
           display: 'block',
           backgroundColor: '#000000',
+          transform: mirrored ? 'scaleX(-1)' : 'none',
         },
       })}
     </View>
