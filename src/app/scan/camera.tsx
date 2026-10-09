@@ -25,6 +25,7 @@ import { ICONS } from '@/components/scan/iconPaths';
 import { Text } from '@/components/ui/Text';
 import { WebCameraView, type WebCameraHandle } from '@/components/WebCameraView';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { setScanPhoto } from '@/services/scanPhotoStore';
 import { describeItem, normalizeBbox, ScanColors, type Box } from '@/constants/scanDesign';
 import {
   getScanObjects,
@@ -275,6 +276,7 @@ export default function ScanCameraScreen() {
       keepPhoto = true;
       photoUriRef.current = isWeb ? taken.uri : null;
       setPhoto({ uri: taken.uri, width: taken.width, height: taken.height });
+      setScanPhoto(resultScanId, { uri: taken.uri, width: taken.width, height: taken.height });
       setScanId(resultScanId);
       setObjects(list.objects);
       setSelected(0);

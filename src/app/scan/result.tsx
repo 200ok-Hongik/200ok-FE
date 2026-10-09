@@ -24,6 +24,7 @@ import {
   type TrashCategory,
   type UserProfile,
 } from '@/services/api';
+import { getScanPhoto } from '@/services/scanPhotoStore';
 
 type Tab = 'report' | 'guide';
 
@@ -143,6 +144,7 @@ export default function ScanResultScreen() {
     );
   }
 
+  const localPhoto = getScanPhoto(scanId);
   const info = describeItem(guide.category.code, guide.category.name);
   const confidence = Math.min(1, Math.max(0, guide.category.confidence));
   const confidencePercent = Math.round(confidence * 100);
@@ -162,7 +164,7 @@ export default function ScanResultScreen() {
           <>
             <SectionTitle title="분석 리포트" subtitle="이미지 분석을 통해 품목을 분류했어요." />
             <View style={[styles.reportCard, cardShadow]}>
-              <ObjectThumb uri={imageUrl} bbox={bbox} size={124} style={styles.reportThumb} />
+              <ObjectThumb uri={localPhoto?.uri ?? imageUrl} bbox={bbox} size={124} style={styles.reportThumb} />
               <View style={styles.reportCopy}>
                 <Text style={styles.reportLead}>이 품목은</Text>
                 <Text style={styles.reportName} numberOfLines={1}>

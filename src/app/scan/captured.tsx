@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ICONS, type IconDef } from '@/components/scan/iconPaths';
@@ -21,8 +21,11 @@ import {
   type ScanDetail,
   type TrashCategory,
 } from '@/services/api';
+import { getScanPhoto } from '@/services/scanPhotoStore';
 
-const PHOTO_HEIGHT = 476;
+// 디자인(375x812)은 사진이 476으로 길지만, 실제 기기에선 화면 높이의 40% 정도로 줄여 아래 폼이 더 많이 보이게 한다.
+const PHOTO_HEIGHT_RATIO = 0.4;
+const MAX_FRAME_HEIGHT = 812;
 
 // 구성품 분리 시트의 칩. 서버 checkItemName이 정확히 무엇인지는 응답을 봐야 알 수 있어서 흔한 이름들을 함께 매칭한다.
 const COMPONENT_CHIPS = [
@@ -78,6 +81,9 @@ export default function ScanCapturedScreen() {
   const { scanId, objectId: objectIdParam } = useLocalSearchParams<{ scanId?: string; objectId?: string }>();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useScanTabBarHeight();
+  const { height: windowHeight } = useWindowDimensions();
+  const photoHeight = Math.round(Math.min(windowHeight, MAX_FRAME_HEIGHT) * PHOTO_HEIGHT_RATIO);
+  const [localPhotoFailed, setLocalPhotoFailed] = useState(false);
 
   const [objectId, setObjectId] = useState<string | null>(objectIdParam ?? null);
   const [scan, setScan] = useState<ScanDetail | null>(null);
@@ -222,15 +228,24 @@ export default function ScanCapturedScreen() {
     );
   }
 
+  // 방금 찍은 사진이 있으면 그걸, 없으면(새로고침 등) 서버 이미지를 보여준다.
+  const localPhoto = getScanPhoto(scanId);
+  const photoUri = !localPhotoFailed && localPhoto ? localPhoto.uri : scan.imageUrl;
+
   const separation = SEPARATION_KEYS.filter((key) => flags[key]).map((key) => SEPARATION_NAMES[key]);
   const separationText = separation.length > 0 ? `${separation.join(', ')} 분리 필요` : '분리 필요 없음';
 
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + 30 }}>
-        <View style={[styles.photoWrap, cardShadow]}>
-          {scan.imageUrl ? (
-            <Image source={{ uri: scan.imageUrl }} style={styles.photo} resizeMode="cover" />
+        <View style={[styles.photoWrap, cardShadow, { height: photoHeight }]}>
+          {photoUri ? (
+            <Image
+              source={{ uri: photoUri }}
+              style={styles.photo}
+              resizeMode="cover"
+              onError={() => localPhoto && setLocalPhotoFailed(true)}
+            />
           ) : (
             <View style={[styles.photo, { backgroundColor: '#15231D' }]} />
           )}
@@ -243,14 +258,38 @@ export default function ScanCapturedScreen() {
           {withParticle(info.detail)} 인식했어요.
         </Text>
 
-        <View style={[styles.card, cardShadow]}>
-          <View style={styles.row}>
+        {(picker === 'kind' || picker === 'material') && (
+          <Pressable accessibilityLabel="목록 닫기" style={styles.dropdownBackdrop} onPress={() => setPicker(null)} />
+        )}
+        <View style={[styles.card, cardShadow, (picker === 'kind' || picker === 'material') && styles.cardRaised]}>
+          <View style={[styles.row, styles.rowKind]}>
             <RowLabel icon={ICONS.rowType} label="종류" />
-            <SelectBox value={info.kind} onPress={() => setPicker('kind')} />
+            <SelectBox
+              value={info.kind}
+              open={picker === 'kind'}
+              onPress={() => setPicker(picker === 'kind' ? null : 'kind')}
+              options={kindOptions.map((kind) => ({ key: kind, label: kind, selected: kind === info.kind, onSelect: () => handleSelectKind(kind) }))}
+            />
           </View>
-          <View style={styles.row}>
+          <View style={[styles.row, styles.rowMaterial]}>
             <RowLabel icon={ICONS.rowMaterial} label="재질" />
-            <SelectBox value={info.material} onPress={() => setPicker('material')} />
+            <SelectBox
+              value={info.material}
+              open={picker === 'material'}
+              onPress={() => setPicker(picker === 'material' ? null : 'material')}
+              options={(materialOptions.length > 0 ? materialOptions : []).map((category) => {
+                const label = describeItem(category.code, category.name).material;
+                return {
+                  key: String(category.categoryId),
+                  label,
+                  selected: category.categoryId === selectedCategory?.categoryId,
+                  onSelect: () => {
+                    setCategoryId(category.categoryId);
+                    setPicker(null);
+                  },
+                };
+              })}
+            />
           </View>
           <View style={styles.row}>
             <RowLabel icon={ICONS.rowDrop} label="오염 상태" />
@@ -309,37 +348,6 @@ export default function ScanCapturedScreen() {
         </View>
       </ScanSheet>
 
-      <ScanSheet
-        visible={picker === 'kind' || picker === 'material'}
-        onClose={() => setPicker(null)}
-        title={picker === 'kind' ? '종류 선택' : '재질 선택'}
-        subtitle="인식 결과가 다르다면 알맞은 항목을 골라주세요."
-        minHeight={300}>
-        <View style={styles.options}>
-          {picker === 'kind' &&
-            kindOptions.map((kind) => (
-              <Option key={kind} label={kind} selected={kind === info.kind} onPress={() => handleSelectKind(kind)} />
-            ))}
-          {picker === 'material' &&
-            (materialOptions.length > 0 ? materialOptions : []).map((category) => {
-              const label = describeItem(category.code, category.name).material;
-              return (
-                <Option
-                  key={category.categoryId}
-                  label={label}
-                  selected={category.categoryId === selectedCategory?.categoryId}
-                  onPress={() => {
-                    setCategoryId(category.categoryId);
-                    setPicker(null);
-                  }}
-                />
-              );
-            })}
-          {picker === 'material' && materialOptions.length === 0 && (
-            <Option label={info.material} selected onPress={() => setPicker(null)} />
-          )}
-        </View>
-      </ScanSheet>
     </View>
   );
 }
@@ -355,12 +363,30 @@ function RowLabel({ icon, label }: { icon: IconDef; label: string }) {
   );
 }
 
-function SelectBox({ value, onPress }: { value: string; onPress: () => void }) {
+type DropdownOption = { key: string; label: string; selected: boolean; onSelect: () => void };
+
+// 선택 박스 바로 아래에 펼쳐지는 드롭다운. 목록이 길면 안에서 스크롤된다.
+function SelectBox({ value, open, onPress, options }: { value: string; open: boolean; onPress: () => void; options: DropdownOption[] }) {
   return (
-    <Pressable onPress={onPress} style={styles.select}>
-      <Text style={styles.selectText} numberOfLines={1}>{value}</Text>
-      <PathIcon icon={ICONS.chevronDown} color={ScanColors.gray} />
-    </Pressable>
+    <View style={styles.selectWrap}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={onPress} style={[styles.select, open && styles.selectOpen]}>
+        <Text style={styles.selectText} numberOfLines={1}>{value}</Text>
+        <View style={open && styles.chevronUp}>
+          <PathIcon icon={ICONS.chevronDown} color={ScanColors.gray} />
+        </View>
+      </Pressable>
+      {open && (
+        <View style={styles.dropdown}>
+          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.dropdownScroll}>
+            {options.map((option) => (
+              <Pressable key={option.key} onPress={option.onSelect} style={[styles.dropdownItem, option.selected && styles.dropdownItemOn]}>
+                <Text style={[styles.dropdownText, option.selected && styles.dropdownTextOn]} numberOfLines={1}>{option.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -375,14 +401,6 @@ function InfoLine({ text, first }: { text: string; first?: boolean }) {
   );
 }
 
-function Option({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, selected && styles.chipOn]}>
-      <Text style={[styles.chipText, selected && styles.chipTextOn]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   centered: { alignItems: 'center', justifyContent: 'center', padding: 24 },
@@ -392,7 +410,7 @@ const styles = StyleSheet.create({
   header: { position: 'absolute', left: 0, right: 0, height: 56, flexDirection: 'row', alignItems: 'center', paddingLeft: 22 },
   back: { marginRight: 15, height: 32, justifyContent: 'center' },
 
-  photoWrap: { height: PHOTO_HEIGHT, borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: '#FFFFFF' },
+  photoWrap: { borderBottomLeftRadius: 16, borderBottomRightRadius: 16, backgroundColor: '#FFFFFF' },
   photo: { width: '100%', height: '100%', borderBottomLeftRadius: 16, borderBottomRightRadius: 16 },
   photoShade: { position: 'absolute', top: 0, left: 0, right: 0, height: 130, pointerEvents: 'none' },
 
@@ -411,6 +429,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: ScanColors.line,
   },
+  rowKind: { zIndex: 4 },
+  rowMaterial: { zIndex: 3 },
   rowLast: { height: 57, borderBottomWidth: 0, paddingRight: 23 },
   rowLabel: { flexDirection: 'row', alignItems: 'center' },
   rowIcon: { width: 22, height: 24, marginRight: 4, alignItems: 'center', justifyContent: 'center' },
@@ -418,6 +438,7 @@ const styles = StyleSheet.create({
   rowValue: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   rowValueText: { fontSize: 13, lineHeight: 18, color: ScanColors.ink },
 
+  selectWrap: { width: 122, height: 31 },
   select: {
     width: 122,
     height: 31,
@@ -431,6 +452,28 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
     backgroundColor: '#FFFFFF',
   },
+  selectOpen: { borderColor: ScanColors.greenDark },
+  chevronUp: { transform: [{ rotate: '180deg' }] },
+  dropdown: {
+    position: 'absolute',
+    top: 35,
+    left: 0,
+    width: 122,
+    borderWidth: 1,
+    borderColor: ScanColors.border,
+    borderRadius: 3.5,
+    backgroundColor: '#FFFFFF',
+    zIndex: 20,
+    elevation: 8,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+  },
+  dropdownScroll: { maxHeight: 188 },
+  dropdownItem: { height: 36, paddingHorizontal: 10.5, justifyContent: 'center' },
+  dropdownItemOn: { backgroundColor: ScanColors.mintChip },
+  dropdownText: { fontSize: 13, color: ScanColors.ink },
+  dropdownTextOn: { color: ScanColors.greenDark, fontWeight: '600' },
+  dropdownBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 },
+  cardRaised: { zIndex: 10 },
   selectText: { flex: 1, fontSize: 13, color: ScanColors.gray },
   toggle: { width: 120, height: 32, flexDirection: 'row' },
   toggleItem: {
@@ -473,7 +516,6 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
 
   chips: { marginTop: 28, flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 9, paddingBottom: 24 },
-  options: { marginTop: 28, flexDirection: 'row', flexWrap: 'wrap', columnGap: 8, rowGap: 9, paddingBottom: 24 },
   chip: { height: 34, paddingHorizontal: 16, borderRadius: 17, backgroundColor: ScanColors.chipGray, alignItems: 'center', justifyContent: 'center' },
   chipOn: { backgroundColor: ScanColors.green },
   chipText: { fontSize: 14, fontWeight: '500', color: '#000000' },

@@ -76,8 +76,9 @@ export function describeItem(code?: string | null, name?: string | null): ItemIn
 
 export type Box = { x: number; y: number; width: number; height: number };
 
-// 백엔드 bbox 단위가 스웨거에 적혀 있지 않아서 값 범위로 추정한다.
-// 0~1 이하면 비율, 이미지 크기 안이면 픽셀, 그보다 크지만 1000 이하면 0~1000 정규화 좌표로 본다.
+// 백엔드 bbox 단위가 스웨거에 적혀 있지 않아서 값 범위와 결과 모양으로 추정한다.
+// 비율(0~1), 사진 픽셀, 0~1000 정규화, 퍼센트(0~100)를 차례로 가정해 보고,
+// 사진의 1.5% 이상을 차지하는 "그럴듯한" 첫 후보를 쓴다. (예: 퍼센트 값을 픽셀로 읽으면 왼쪽 위의 점만 한 박스가 된다)
 export function normalizeBbox(
   bbox: ScanObjectSummary['bbox'] | undefined,
   imageWidth: number,
@@ -87,26 +88,27 @@ export function normalizeBbox(
   const { xMin, yMin, xMax, yMax } = bbox;
   if (![xMin, yMin, xMax, yMax].every((value) => Number.isFinite(value)) || xMax <= xMin || yMax <= yMin) return null;
 
-  const peak = Math.max(xMin, yMin, xMax, yMax);
-  let fx: [number, number];
-  let fy: [number, number];
-  if (peak <= 1.001) {
-    fx = [xMin, xMax];
-    fy = [yMin, yMax];
-  } else if (imageWidth > 0 && imageHeight > 0 && xMax <= imageWidth * 1.01 && yMax <= imageHeight * 1.01) {
-    fx = [xMin / imageWidth, xMax / imageWidth];
-    fy = [yMin / imageHeight, yMax / imageHeight];
-  } else if (peak <= 1000) {
-    fx = [xMin / 1000, xMax / 1000];
-    fy = [yMin / 1000, yMax / 1000];
-  } else {
-    return null;
-  }
+  const hasSize = imageWidth > 0 && imageHeight > 0;
+  const candidates: { name: string; divisorX: number; divisorY: number }[] = [
+    { name: 'fraction', divisorX: 1, divisorY: 1 },
+    ...(hasSize ? [{ name: 'pixel', divisorX: imageWidth, divisorY: imageHeight }] : []),
+    { name: 'permille', divisorX: 1000, divisorY: 1000 },
+    { name: 'percent', divisorX: 100, divisorY: 100 },
+  ];
 
   const clamp = (value: number) => Math.min(1, Math.max(0, value));
-  const x = clamp(fx[0]);
-  const y = clamp(fy[0]);
-  const width = clamp(fx[1]) - x;
-  const height = clamp(fy[1]) - y;
-  return width > 0.01 && height > 0.01 ? { x, y, width, height } : null;
+  let best: { box: Box; area: number; name: string } | null = null;
+  for (const candidate of candidates) {
+    const fx = [xMin / candidate.divisorX, xMax / candidate.divisorX];
+    const fy = [yMin / candidate.divisorY, yMax / candidate.divisorY];
+    if (Math.max(...fx, ...fy) > 1.01 || Math.min(...fx, ...fy) < -0.01) continue;
+    const x = clamp(fx[0]);
+    const y = clamp(fy[0]);
+    const box = { x, y, width: clamp(fx[1]) - x, height: clamp(fy[1]) - y };
+    if (box.width <= 0.01 || box.height <= 0.01) continue;
+    const area = box.width * box.height;
+    if (area >= 0.015) return box;
+    if (!best || area > best.area) best = { box, area, name: candidate.name };
+  }
+  return best?.box ?? null;
 }
