@@ -26,7 +26,7 @@ import { Text } from '@/components/ui/Text';
 import { WebCameraView, type WebCameraHandle } from '@/components/WebCameraView';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { setScanPhoto } from '@/services/scanPhotoStore';
-import { describeItem, normalizeBbox, ScanColors, type Box } from '@/constants/scanDesign';
+import { describeItem, normalizeBbox, pruneObjects, ScanColors, type Box } from '@/constants/scanDesign';
 import {
   getScanObjects,
   ScanUploadError,
@@ -278,7 +278,11 @@ export default function ScanCameraScreen() {
       setPhoto({ uri: taken.uri, width: taken.width, height: taken.height });
       setScanPhoto(resultScanId, { uri: taken.uri, width: taken.width, height: taken.height });
       setScanId(resultScanId);
-      setObjects(list.objects);
+      const shown = pruneObjects(list.objects, taken.width ?? 0, taken.height ?? 0);
+      if (shown.length !== list.objects.length) {
+        console.info('[SSOK AI] 겹치거나 작은 조각 물건을 제외했어요:', list.objects.length, '→', shown.length);
+      }
+      setObjects(shown);
       setSelected(0);
       setPhase('recognized');
     } catch (error) {
@@ -405,8 +409,8 @@ export default function ScanCameraScreen() {
             showsHorizontalScrollIndicator={false}
             snapToInterval={CARD_SNAP}
             decelerationRate="fast"
-            onScroll={handleCardScroll}
-            scrollEventThrottle={16}
+            onMomentumScrollEnd={handleCardScroll}
+            onScrollEndDrag={handleCardScroll}
             contentContainerStyle={{ paddingLeft: CARD_LEFT, paddingRight: screen.width - CARD_LEFT - CARD_WIDTH, gap: CARD_GAP }}>
             {objects.map((object) => (
               <ObjectCard key={object.objectId} object={object} photo={photo} onOpen={() => openObject(object)} />

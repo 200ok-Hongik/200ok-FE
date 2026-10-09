@@ -112,3 +112,49 @@ export function normalizeBbox(
   }
   return best?.box ?? null;
 }
+
+// 한 물건을 AI가 전체/뚜껑/빨대처럼 조각내서 여러 개로 인식하는 경우가 있다.
+// 같은 품목이면서 이미 남긴 더 큰 물건과 많이 겹치거나, 사진에서 너무 작은 조각은 카드로 보여주지 않는다.
+// bbox를 해석할 수 없는 물건은 판단할 수 없으니 그대로 둔다. 결과가 비지 않도록 최소 1개는 남긴다.
+const MIN_OBJECT_AREA = 0.02;
+const OVERLAP_RATIO = 0.4;
+
+export function pruneObjects(
+  objects: ScanObjectSummary[],
+  imageWidth: number,
+  imageHeight: number
+): ScanObjectSummary[] {
+  const measured = objects.map((object) => ({
+    object,
+    box: normalizeBbox(object.bbox, imageWidth, imageHeight),
+    code: object.finalResult?.itemCode ?? '',
+  }));
+
+  const kept: typeof measured = [];
+  const bySize = [...measured].sort(
+    (a, b) => (b.box ? b.box.width * b.box.height : 1) - (a.box ? a.box.width * a.box.height : 1)
+  );
+
+  for (const candidate of bySize) {
+    const { box } = candidate;
+    if (!box) {
+      kept.push(candidate);
+      continue;
+    }
+    const area = box.width * box.height;
+    if (area < MIN_OBJECT_AREA) continue;
+
+    const isPart = kept.some((other) => {
+      if (!other.box || other.code !== candidate.code) return false;
+      const overlapW = Math.min(box.x + box.width, other.box.x + other.box.width) - Math.max(box.x, other.box.x);
+      const overlapH = Math.min(box.y + box.height, other.box.y + other.box.height) - Math.max(box.y, other.box.y);
+      if (overlapW <= 0 || overlapH <= 0) return false;
+      return (overlapW * overlapH) / area >= OVERLAP_RATIO;
+    });
+    if (!isPart) kept.push(candidate);
+  }
+
+  const keptSet = new Set(kept.map((item) => item.object.objectId));
+  const result = objects.filter((object) => keptSet.has(object.objectId));
+  return result.length > 0 ? result : objects.slice(0, 1);
+}
