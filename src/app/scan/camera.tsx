@@ -7,6 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { WebCameraView, type WebCameraHandle } from '@/components/WebCameraView';
 import { ScanUploadError, uploadScan, type AnalysisStatus } from '@/services/api';
 
 const TAB_ICONS = [
@@ -16,65 +17,6 @@ const TAB_ICONS = [
   { name: 'bookmark-outline' as const, label: '가이드', route: '/(tabs)/guide' as const },
   { name: 'person-outline' as const, label: 'My', route: '/(tabs)/mypage' as const },
 ];
-
-async function getWebCameraTrack(timeoutMs = 5000) {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    const videos = Array.from(document.querySelectorAll('video'));
-    for (const video of videos) {
-      const stream = video.srcObject instanceof MediaStream ? video.srcObject : null;
-      const track = stream?.getVideoTracks()[0];
-      if (track) return track;
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, 100));
-  }
-
-  return null;
-}
-
-async function maximizeWebCameraStream() {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-
-  const track = await getWebCameraTrack();
-  if (!track) throw new Error('웹 카메라 영상 스트림을 찾지 못했어요.');
-
-  const capabilities = track.getCapabilities?.();
-  const maxWidth = capabilities?.width?.max ?? 3840;
-  const maxHeight = capabilities?.height?.max ?? 2160;
-
-  try {
-    await track.applyConstraints({
-      width: { min: Math.min(1280, maxWidth), ideal: Math.min(maxWidth, 3840) },
-      height: { min: Math.min(720, maxHeight), ideal: Math.min(maxHeight, 2160) },
-      frameRate: { ideal: 30 },
-    });
-  } catch (error) {
-    console.warn('[SSOK Camera] 최대 웹 해상도를 적용하지 못해 Full HD로 재시도해요:', error);
-    await track.applyConstraints({
-      width: { ideal: 1920 },
-      height: { ideal: 1080 },
-      frameRate: { ideal: 30 },
-    });
-  }
-
-  const focusModes = (capabilities as MediaTrackCapabilities & { focusMode?: string[] } | undefined)
-    ?.focusMode;
-  if (focusModes?.includes('continuous')) {
-    await track
-      .applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] })
-      .catch(() => undefined);
-  }
-
-  const settings = track.getSettings();
-  console.info('[SSOK Camera] 웹 카메라 스트림:', settings);
-
-  if ((settings.width ?? 0) < 1280 || (settings.height ?? 0) < 720) {
-    throw new Error(
-      `브라우저가 고해상도 카메라를 허용하지 않았어요. (${settings.width ?? 0}x${settings.height ?? 0})`
-    );
-  }
-}
 
 function captureWithSystemCamera(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -127,25 +69,49 @@ export default function ScanCameraScreen() {
   const [pictureSize, setPictureSize] = useState<string>();
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  // 임시 진단용: 웹 카메라가 실제로 몇 픽셀로 열렸는지 화면에 표시한다. 확인 후 삭제.
+  const [streamResolution, setStreamResolution] = useState<string | null>(null);
   const requestedRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
+  const webCameraRef = useRef<WebCameraHandle>(null);
+  const isWeb = Platform.OS === 'web';
 
   useEffect(() => {
-    if (!permission) return;
+    // 웹은 WebCameraView가 스트림을 열면서 직접 권한을 요청한다.
+    // (expo-camera 권한 확인이 저해상도 스트림을 한 번 더 열어 Safari에서 권한 팝업이 두 번 뜨는 것도 방지)
+    if (isWeb || !permission) return;
     if (!permission.granted && !requestedRef.current) {
       requestedRef.current = true;
       requestPermission();
     }
-  }, [permission, requestPermission]);
+  }, [isWeb, permission, requestPermission]);
 
-  const cameraGranted = permission?.granted;
+  const cameraGranted = isWeb ? true : permission?.granted;
+
+  const pausePreview = async () => {
+    if (isWeb) webCameraRef.current?.pausePreview();
+    else await cameraRef.current?.pausePreview();
+  };
+
+  const resumePreview = async () => {
+    if (isWeb) webCameraRef.current?.resumePreview();
+    else await cameraRef.current?.resumePreview().catch(() => undefined);
+  };
+
+  const captureWebPhoto = async () => {
+    try {
+      return await webCameraRef.current!.takePictureAsync();
+    } catch (error) {
+      // 스트림에서 프레임을 못 뽑는 브라우저는 기기 기본 카메라 앱으로 촬영한다.
+      console.warn('[SSOK Camera] 스트림 촬영에 실패해 시스템 카메라로 전환해요:', error);
+      return { uri: await captureWithSystemCamera(), width: undefined, height: undefined };
+    }
+  };
 
   const handleCameraReady = async () => {
     if (!cameraRef.current) return;
 
     try {
-      await maximizeWebCameraStream();
-
       // iOS는 기기 지원 여부와 상관없이 고정 프리셋 목록("3840x2160", "Photo" 등)을 돌려주고,
       // "3840x2160"은 16:9 비디오 프리셋이라 기본 "Photo" 프리셋(12MP 사진 파이프라인)보다
       // 오히려 화질이 떨어진다. iOS는 기본 Photo 프리셋을 그대로 쓰고, Android만 최대 크기를 고른다.
@@ -177,7 +143,7 @@ export default function ScanCameraScreen() {
       Alert.alert('카메라 권한이 필요해요', message);
       return;
     }
-    if (!isCameraReady || !cameraRef.current) {
+    if (!isCameraReady || !(isWeb ? webCameraRef.current : cameraRef.current)) {
       setCaptureError('카메라를 준비하고 있어요. 잠시 후 다시 눌러주세요.');
       return;
     }
@@ -188,14 +154,15 @@ export default function ScanCameraScreen() {
       setCaptureError(null);
       setUploadStatus('사진을 촬영하고 있어요…');
       setIsUploading(true);
-      const photo = Platform.OS === 'web'
-        ? { uri: (webImageUrl = await captureWithSystemCamera()), width: undefined, height: undefined }
-        : await cameraRef.current.takePictureAsync({
+      const photo = isWeb
+        ? await captureWebPhoto()
+        : await cameraRef.current!.takePictureAsync({
             // 압축 손실을 최소화한다. (iOS 기본값도 1이지만 Android 등에서 명시적으로 고정)
             quality: 1,
             skipProcessing: true,
           });
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
+      if (isWeb) webImageUrl = photo.uri;
       console.info('[SSOK Camera] 촬영 이미지:', {
         width: photo.width,
         height: photo.height,
@@ -203,7 +170,7 @@ export default function ScanCameraScreen() {
       });
       didCapturePhoto = true;
 
-      await cameraRef.current.pausePreview();
+      await pausePreview();
       setUploadStatus('사진을 분석하고 있어요…');
       const result = await uploadScan(photo.uri, (status: AnalysisStatus) => {
         if (status === 'QUEUED') setUploadStatus('AI 분석을 기다리고 있어요…');
@@ -215,7 +182,7 @@ export default function ScanCameraScreen() {
       router.push({ pathname: '/scan/captured', params: { scanId: String(resultScanId) } });
     } catch (error) {
       console.error(error);
-      await cameraRef.current?.resumePreview().catch(() => undefined);
+      await resumePreview();
       const detail = error instanceof Error ? error.message : '';
       let title = didCapturePhoto ? '분석 요청 실패' : '촬영 실패';
       let message = detail || '사진을 전송하지 못했어요. 네트워크를 확인해주세요.';
@@ -248,7 +215,20 @@ export default function ScanCameraScreen() {
 
   return (
     <View style={styles.container}>
-      {cameraGranted ? (
+      {isWeb ? (
+        <WebCameraView
+          ref={webCameraRef}
+          onReady={({ width, height }) => {
+            setCaptureError(null);
+            setStreamResolution(`${width}×${height}`);
+            setIsCameraReady(true);
+          }}
+          onError={(message) => {
+            setIsCameraReady(false);
+            setCaptureError(message);
+          }}
+        />
+      ) : cameraGranted ? (
         <CameraView
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
@@ -287,6 +267,9 @@ export default function ScanCameraScreen() {
           </View>
 
           <Text style={styles.hint}>재활용품이 잘 보이도록 화면을 반듯하게 유지해주세요</Text>
+          {isWeb && streamResolution && (
+            <Text style={styles.resolutionBadge}>카메라 해상도 {streamResolution}</Text>
+          )}
           {captureError && <Text style={styles.captureError}>{captureError}</Text>}
           {uploadStatus && <Text style={styles.uploadStatus}>{uploadStatus}</Text>}
         </View>
@@ -390,6 +373,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     fontSize: FontSize.sm,
     marginTop: Spacing.md,
+  },
+  resolutionBadge: {
+    alignSelf: 'center',
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    color: '#FFFFFF',
+    fontSize: FontSize.xs,
   },
   captureError: {
     marginTop: Spacing.sm,
