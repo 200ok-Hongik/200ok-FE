@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { uploadScan, type AnalysisStatus } from '@/services/api';
+import { ScanUploadError, uploadScan, type AnalysisStatus } from '@/services/api';
 
 const TAB_ICONS = [
   { name: 'home-outline' as const, label: '홈', route: '/(tabs)' as const },
@@ -17,10 +17,49 @@ const TAB_ICONS = [
   { name: 'person-outline' as const, label: 'My', route: '/(tabs)/mypage' as const },
 ];
 
+async function maximizeWebCameraStream() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+
+  const video = document.querySelector('video');
+  const stream = video?.srcObject instanceof MediaStream ? video.srcObject : null;
+  const track = stream?.getVideoTracks()[0];
+  if (!track) return;
+
+  const capabilities = track.getCapabilities?.();
+  const maxWidth = capabilities?.width?.max ?? 3840;
+  const maxHeight = capabilities?.height?.max ?? 2160;
+
+  try {
+    await track.applyConstraints({
+      width: { ideal: Math.min(maxWidth, 3840) },
+      height: { ideal: Math.min(maxHeight, 2160) },
+      frameRate: { ideal: 30 },
+    });
+  } catch (error) {
+    console.warn('[SSOK Camera] 최대 웹 해상도를 적용하지 못해 Full HD로 재시도해요:', error);
+    await track.applyConstraints({
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      frameRate: { ideal: 30 },
+    });
+  }
+
+  const focusModes = (capabilities as MediaTrackCapabilities & { focusMode?: string[] } | undefined)
+    ?.focusMode;
+  if (focusModes?.includes('continuous')) {
+    await track
+      .applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] })
+      .catch(() => undefined);
+  }
+
+  console.info('[SSOK Camera] 웹 카메라 스트림:', track.getSettings());
+}
+
 export default function ScanCameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [isUploading, setIsUploading] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [pictureSize, setPictureSize] = useState<string>();
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const requestedRef = useRef(false);
@@ -36,6 +75,29 @@ export default function ScanCameraScreen() {
 
   const cameraGranted = permission?.granted;
 
+  const handleCameraReady = async () => {
+    if (!cameraRef.current) return;
+
+    try {
+      await maximizeWebCameraStream();
+      const sizes = await cameraRef.current.getAvailablePictureSizesAsync();
+      const largestSize = sizes.reduce<string | undefined>((largest, current) => {
+        const [width, height] = current.split('x').map(Number);
+        const [largestWidth = 0, largestHeight = 0] = (largest ?? '').split('x').map(Number);
+        const currentPixels = width * height;
+        const largestPixels = largestWidth * largestHeight;
+
+        return Number.isFinite(currentPixels) && currentPixels > largestPixels ? current : largest;
+      }, undefined);
+
+      if (largestSize) setPictureSize(largestSize);
+    } catch (error) {
+      console.warn('[SSOK Camera] 지원 사진 크기를 확인하지 못했어요:', error);
+    } finally {
+      setIsCameraReady(true);
+    }
+  };
+
   const handleCapture = async () => {
     if (isUploading) return;
     if (!cameraGranted) {
@@ -49,17 +111,27 @@ export default function ScanCameraScreen() {
       return;
     }
 
+    let didCapturePhoto = false;
     try {
       setCaptureError(null);
       setUploadStatus('사진을 촬영하고 있어요…');
       setIsUploading(true);
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 1,
+        // Native에서는 Expo의 회전·리사이즈·재압축 단계를 건너뛰어
+        // 카메라 센서가 만든 원본 해상도와 디테일을 최대한 유지한다.
+        skipProcessing: Platform.OS !== 'web',
+        quality: Platform.OS === 'web' ? 1 : undefined,
         base64: Platform.OS === 'web',
         imageType: Platform.OS === 'web' ? 'jpg' : undefined,
         scale: Platform.OS === 'web' ? 1 : undefined,
       });
       if (!photo?.uri) throw new Error('사진을 촬영하지 못했어요.');
+      console.info('[SSOK Camera] 촬영 이미지:', {
+        width: photo.width,
+        height: photo.height,
+        pictureSize,
+      });
+      didCapturePhoto = true;
 
       await cameraRef.current.pausePreview();
       setUploadStatus('사진을 분석하고 있어요…');
@@ -75,13 +147,28 @@ export default function ScanCameraScreen() {
       console.error(error);
       await cameraRef.current?.resumePreview().catch(() => undefined);
       const detail = error instanceof Error ? error.message : '';
-      const message = detail.includes('502') || detail.includes('503') || detail.includes('504')
-        ? 'AI 분석 서버가 응답하지 않아요. 잠시 후 다시 시도해주세요.'
-        : detail.includes('SSOK API 401')
-          ? '로그인 상태를 확인한 뒤 다시 시도해주세요.'
-          : detail || '사진을 전송하지 못했어요. 네트워크를 확인해주세요.';
+      let title = didCapturePhoto ? '분석 요청 실패' : '촬영 실패';
+      let message = detail || '사진을 전송하지 못했어요. 네트워크를 확인해주세요.';
+
+      if (error instanceof ScanUploadError) {
+        const titles = {
+          IMAGE_PREPARATION: '사진 준비 실패',
+          SUBMISSION: '분석 요청 실패',
+          STATUS_CHECK: '분석 상태 확인 실패',
+          AI_ANALYSIS: 'AI 분석 실패',
+          RESULT: '분석 결과 오류',
+          TIMEOUT: '분석 지연',
+        } as const;
+        title = titles[error.phase];
+      }
+
+      if (detail.includes('502') || detail.includes('503') || detail.includes('504')) {
+        message = 'AI 분석 서버가 응답하지 않아요. 잠시 후 다시 시도해주세요.';
+      } else if (detail.includes('SSOK API 401')) {
+        message = '로그인 상태를 확인한 뒤 다시 시도해주세요.';
+      }
       setCaptureError(message);
-      Alert.alert('분석 실패', message);
+      Alert.alert(title, message);
     } finally {
       setUploadStatus(null);
       setIsUploading(false);
@@ -96,7 +183,10 @@ export default function ScanCameraScreen() {
           style={StyleSheet.absoluteFill}
           facing="back"
           mode="picture"
-          onCameraReady={() => setIsCameraReady(true)}
+          autofocus="on"
+          zoom={0}
+          pictureSize={Platform.OS === 'web' ? undefined : pictureSize}
+          onCameraReady={handleCameraReady}
           onMountError={(event) => {
             setIsCameraReady(false);
             setCaptureError(event.message || '카메라를 시작하지 못했어요.');

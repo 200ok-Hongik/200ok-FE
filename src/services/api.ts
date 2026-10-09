@@ -49,6 +49,24 @@ export type AnalysisJob = {
 
 export type ScanUploadResult = { scanResultId: number };
 export type AnalysisStatus = 'QUEUED' | 'ANALYZING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type ScanUploadErrorPhase =
+  | 'IMAGE_PREPARATION'
+  | 'SUBMISSION'
+  | 'STATUS_CHECK'
+  | 'AI_ANALYSIS'
+  | 'RESULT'
+  | 'TIMEOUT';
+
+export class ScanUploadError extends Error {
+  constructor(
+    message: string,
+    public readonly phase: ScanUploadErrorPhase,
+    options?: { cause?: unknown }
+  ) {
+    super(message, options);
+    this.name = 'ScanUploadError';
+  }
+}
 
 export type ScanDetail = {
   scanId: number;
@@ -246,9 +264,13 @@ function completedScanResult(job: AnalysisJob): ScanUploadResult | null {
   if (job.status?.toUpperCase() !== 'COMPLETED') return null;
   const scanResultId = Number(job.result?.scanResultId);
   if (!Number.isFinite(scanResultId) || scanResultId <= 0) {
-    throw new Error('완료된 분석에 스캔 결과 ID가 없어요.');
+    throw new ScanUploadError('완료된 분석에 스캔 결과 ID가 없어요.', 'RESULT');
   }
   return { scanResultId };
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
 
 export async function uploadScan(
@@ -260,9 +282,15 @@ export async function uploadScan(
   if (Platform.OS === 'web') {
     const isFetchableUri = /^(data:|blob:|https?:\/\/)/i.test(imageUri);
     const sourceUri = isFetchableUri ? imageUri : `data:image/jpeg;base64,${imageUri}`;
-    const imageResponse = await fetch(sourceUri);
-    if (!imageResponse.ok) throw new Error('촬영한 이미지를 불러오지 못했어요.');
-    const imageBlob = await imageResponse.blob();
+    const imageResponse = await fetch(sourceUri).catch((error) => {
+      throw new ScanUploadError('촬영한 이미지를 불러오지 못했어요.', 'IMAGE_PREPARATION', { cause: error });
+    });
+    if (!imageResponse.ok) {
+      throw new ScanUploadError('촬영한 이미지를 불러오지 못했어요.', 'IMAGE_PREPARATION');
+    }
+    const imageBlob = await imageResponse.blob().catch((error) => {
+      throw new ScanUploadError('촬영한 이미지를 준비하지 못했어요.', 'IMAGE_PREPARATION', { cause: error });
+    });
     const uploadBlob = imageBlob.type
       ? imageBlob
       : new Blob([imageBlob], { type: 'image/jpeg' });
@@ -276,24 +304,59 @@ export async function uploadScan(
   }
 
   // Content-Type is omitted so fetch can add the multipart boundary.
-  const job = await request<AnalysisJob>('/api/ai/analysis', {
-    method: 'POST',
-    body: formData,
-  });
+  let job: AnalysisJob;
+  try {
+    job = await request<AnalysisJob>('/api/ai/analysis', {
+      method: 'POST',
+      body: formData,
+    });
+  } catch (error) {
+    throw new ScanUploadError(
+      errorMessage(error, 'AI 분석 요청을 접수하지 못했어요.'),
+      'SUBMISSION',
+      { cause: error }
+    );
+  }
   console.info('[SSOK AI] 분석 접수 응답:', job);
-  if (!job?.jobId) throw new Error('백엔드가 AI 작업 ID를 반환하지 않았어요.');
+  if (!job?.jobId) {
+    throw new ScanUploadError('백엔드가 AI 작업 ID를 반환하지 않았어요.', 'SUBMISSION');
+  }
 
   const initialStatus = job.status?.toUpperCase() as AnalysisStatus;
   if (initialStatus) onStatusChange?.(initialStatus);
   const initialResult = completedScanResult(job);
   if (initialResult) return initialResult;
   if (initialStatus === 'FAILED') {
-    throw new Error(job.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.');
+    throw new ScanUploadError(
+      job.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.',
+      'AI_ANALYSIS'
+    );
   }
 
   const deadline = Date.now() + 90000;
+  let consecutiveStatusErrors = 0;
   while (Date.now() < deadline) {
-    const current = await request<AnalysisJob>(`/api/ai/analysis/${encodeURIComponent(job.jobId)}`);
+    let current: AnalysisJob;
+    try {
+      current = await request<AnalysisJob>(`/api/ai/analysis/${encodeURIComponent(job.jobId)}`);
+      consecutiveStatusErrors = 0;
+    } catch (error) {
+      consecutiveStatusErrors += 1;
+      console.warn('[SSOK AI] 분석 상태 조회 실패:', {
+        jobId: job.jobId,
+        attempt: consecutiveStatusErrors,
+        error,
+      });
+      if (consecutiveStatusErrors >= 3) {
+        throw new ScanUploadError(
+          errorMessage(error, 'AI 분석 상태를 확인하지 못했어요.'),
+          'STATUS_CHECK',
+          { cause: error }
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      continue;
+    }
     console.info('[SSOK AI] 분석 조회 응답:', current);
     const status = current.status?.toUpperCase() as AnalysisStatus;
     if (status) onStatusChange?.(status);
@@ -301,13 +364,19 @@ export async function uploadScan(
     const result = completedScanResult(current);
     if (result) return result;
     if (status === 'FAILED') {
-      throw new Error(current.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.');
+      throw new ScanUploadError(
+        current.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.',
+        'AI_ANALYSIS'
+      );
     }
 
     await new Promise((resolve) => setTimeout(resolve, 1500));
   }
 
-  throw new Error('AI 분석 시간이 초과되었어요. 잠시 후 다시 시도해주세요.');
+  throw new ScanUploadError(
+    'AI 분석이 예상보다 오래 걸리고 있어요. 잠시 후 다시 시도해주세요.',
+    'TIMEOUT'
+  );
 }
 
 export async function checkAiServerHealth(): Promise<string> {
