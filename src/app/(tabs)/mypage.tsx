@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
@@ -15,7 +15,8 @@ export default function MyPageScreen() {
   const [isSavingNotify, setIsSavingNotify] = useState(false);
   const [notifyError, setNotifyError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // 프로필 수정·지역 변경 화면에서 돌아올 때마다 최신 정보를 다시 불러온다.
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
     getProfile().then((data) => {
       if (cancelled) return;
@@ -24,7 +25,7 @@ export default function MyPageScreen() {
     })
       .catch((error) => console.warn('프로필을 불러오지 못했습니다.', error));
     return () => { cancelled = true; };
-  }, []);
+  }, []));
 
   // 스위치는 바로 반영해서 보여주고, 서버 저장에 실패하면 원래 값으로 되돌린다.
   const handleNotifyChange = async (enabled: boolean) => {
@@ -80,7 +81,7 @@ export default function MyPageScreen() {
                 ? <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} />
                 : <Text style={s.avatarFallback}>🐹</Text>}
             </View>
-            <Pressable style={s.avatarEdit} onPress={() => router.push('/setting')}>
+            <Pressable style={s.avatarEdit} onPress={() => router.push('/profile-edit')}>
               <Ionicons name="pencil" size={14} color="#FFFFFF" />
             </Pressable>
           </View>
@@ -111,7 +112,7 @@ export default function MyPageScreen() {
         <View style={s.divider} />
         <Text style={[s.sectionTitle, s.settingsTitle]}>설정 및 관리</Text>
         <View style={s.settingsList}>
-          <Pressable style={s.settingRow}><Text style={s.settingLabel}>내 정보 관리</Text></Pressable>
+          <Pressable style={s.settingRow} onPress={() => router.push('/profile-edit')}><Text style={s.settingLabel}>내 정보 관리</Text></Pressable>
           <Pressable style={s.settingRow}>
             <Text style={s.settingLabel}>계정 연동 관리</Text>
             <View style={s.kakao}><Ionicons name="chatbubble" size={11} color="#251B00" /></View>

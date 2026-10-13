@@ -551,6 +551,15 @@ export async function getProfile(): Promise<UserProfile> {
   return request<UserProfile>('/api/users/me');
 }
 
+// 이름과 프로필 이미지 주소를 수정한다. (스웨거에 이미지 업로드 API는 없고 주소만 받는다)
+export async function updateProfile(body: { name?: string; profileImageUrl?: string }): Promise<UserProfile> {
+  return request<UserProfile>('/api/users/me', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 // 분리배출 알림 수신 여부를 켜거나 끈다. 갱신된 프로필을 돌려준다.
 export async function updateNotificationEnabled(enabled: boolean): Promise<UserProfile> {
   return request<UserProfile>('/api/users/me/notifications', {

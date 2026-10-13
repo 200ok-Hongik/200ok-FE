@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
@@ -82,7 +82,7 @@ export default function HomeScreen() {
     }
   }, [feedback]);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (!today) return;
     let cancelled = false;
     const year = today.getFullYear();
@@ -102,7 +102,7 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [today]);
+  }, [today]));
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
