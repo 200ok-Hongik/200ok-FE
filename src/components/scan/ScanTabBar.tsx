@@ -37,8 +37,8 @@ export function ScanTabBar({ variant }: Props) {
     <View style={[styles.bar, { height }, !dark && styles.barLight]}>
       {dark && (
         <LinearGradient
-          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)']}
-          style={[StyleSheet.absoluteFill, styles.passThrough, { top: -50 }]}
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)']}
+          style={[StyleSheet.absoluteFill, styles.passThrough, { top: -30 }]}
         />
       )}
       <View style={styles.row}>

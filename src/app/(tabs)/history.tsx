@@ -160,6 +160,8 @@ export default function HistoryScreen() {
     const localToday = new Date();
     setToday(localToday);
     setCursor({ year: localToday.getFullYear(), month: localToday.getMonth() });
+    // 처음 들어와도 오늘 날짜가 선택된 상태로 하단 기록 패널을 보여준다.
+    setSelected(toDateKey(localToday.getFullYear(), localToday.getMonth(), localToday.getDate()));
     setPendingDate({
       year: localToday.getFullYear(),
       month: localToday.getMonth() + 1,

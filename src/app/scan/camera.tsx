@@ -46,6 +46,7 @@ const VIEWFINDER_WIDTH = 252;
 const VIEWFINDER_HEIGHT = 352;
 const BOX_PAD_X = 44;
 const BOX_PAD_Y = 28;
+const SHUTTER_SIZE = 64;
 const MIN_BOX_WIDTH = 120;
 const MIN_BOX_HEIGHT = 150;
 
@@ -335,11 +336,16 @@ export default function ScanCameraScreen() {
 
   // 디자인 기준 위치: 카드 상단 y=64(상태바 아래 20), 기본 뷰파인더 상단 y=229
   const cardsTop = Math.max(insets.top, 44) + 20;
+  // 뷰파인더는 카드/점 표시 아래부터 셔터 버튼 위까지의 빈 공간 안에서만 잡는다. (화면이 낮으면 그만큼 줄어든다)
+  const shutterTop = screen.height - (tabBarHeight + 14 + SHUTTER_SIZE);
+  const finderTop = cardsTop + 130;
+  const finderHeight = Math.max(MIN_BOX_HEIGHT, Math.min(VIEWFINDER_HEIGHT, shutterTop - 16 - finderTop));
+  const finderWidth = Math.min(VIEWFINDER_WIDTH, screen.width - 48);
   const defaultBox: Box = {
-    x: (screen.width - VIEWFINDER_WIDTH) / 2,
-    y: cardsTop + 165,
-    width: VIEWFINDER_WIDTH,
-    height: VIEWFINDER_HEIGHT,
+    x: (screen.width - finderWidth) / 2,
+    y: finderTop,
+    width: finderWidth,
+    height: finderHeight,
   };
 
   let viewfinderBox = defaultBox;
@@ -392,9 +398,6 @@ export default function ScanCameraScreen() {
           <Text style={styles.permissionText}>카메라 권한이 필요해요.</Text>
         </View>
       )}
-
-      {/* 디자인의 위/아래 어둠 그라데이션 */}
-      <LinearGradient colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={styles.topShade} />
 
       {phase !== 'recognized' && !isUploading && (
         <Viewfinder box={defaultBox} />
@@ -489,7 +492,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.scanDark, overflow: 'hidden' },
   permissionFallback: { alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
   permissionText: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm },
-  topShade: { position: 'absolute', top: 0, left: 0, right: 0, height: 170, pointerEvents: 'none' },
 
   cardsArea: { position: 'absolute', left: 0, right: 0 },
   card: {
@@ -548,9 +550,9 @@ const styles = StyleSheet.create({
   shutter: {
     position: 'absolute',
     alignSelf: 'center',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: SHUTTER_SIZE,
+    height: SHUTTER_SIZE,
+    borderRadius: SHUTTER_SIZE / 2,
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center',
