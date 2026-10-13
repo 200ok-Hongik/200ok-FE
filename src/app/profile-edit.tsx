@@ -138,6 +138,9 @@ export default function ProfileEditScreen() {
             editable={!isLoading}
             maxLength={20}
             autoCorrect={false}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
             placeholder="이름을 입력해주세요"
             placeholderTextColor="#9CA3AF"
             style={styles.input}
@@ -191,7 +194,8 @@ const styles = StyleSheet.create({
   scroll: { paddingTop: 34, paddingHorizontal: 24, paddingBottom: 24 },
   avatarWrap: { alignSelf: 'center', width: 112, height: 112 },
   avatarImage: { width: 112, height: 112, borderRadius: 56, backgroundColor: MINT },
-  badge: { position: 'absolute', left: 57, top: 57 },
+  // 시안 기준: 원 중심에서 오른쪽·아래로 38px 떨어진 곳이 배지 중심 (배지 크기 39)
+  badge: { position: 'absolute', left: 74.5, top: 74.5 },
   changePhoto: { marginTop: 21, textAlign: 'center', fontSize: 14, lineHeight: 20, fontWeight: '700', color: GREEN_DARK },
 
   label: { marginTop: 36, fontSize: 14, lineHeight: 20, fontWeight: '700', color: INK },

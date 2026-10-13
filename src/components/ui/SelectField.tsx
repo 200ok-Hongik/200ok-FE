@@ -46,7 +46,8 @@ export function SelectField({
           styles.field,
           disabled && styles.fieldDisabled,
           style,
-          selected && (!inline || open) && styles.fieldFilled,
+          // 값을 고르면 펼쳐져 있든 닫혀 있든 초록으로 표시한다.
+          selected && styles.fieldFilled,
           inline && open && styles.fieldOpen,
         ]}>
         <View style={{ flex: 1 }}>

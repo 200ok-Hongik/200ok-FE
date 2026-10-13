@@ -131,6 +131,10 @@ export default function HelpCenterScreen() {
               placeholder="궁금한 내용을 검색해보세요"
               placeholderTextColor={MUTED}
               returnKeyType="search"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              inputMode="search"
               style={styles.searchInput}
             />
           </View>

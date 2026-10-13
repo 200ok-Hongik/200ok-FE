@@ -105,6 +105,11 @@ export default function GuideScreen() {
                 clearButtonMode="while-editing"
                 onSubmitEditing={openFirstSearchResult}
                 autoCorrect={false}
+                // 자동완성·맞춤법·대문자 보조가 뜨지 않게 해서 iOS의 "개인정보 보호" 안내가 나오는 것을 줄인다.
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                inputMode="search"
               />
               <Pressable
                 hitSlop={10}
@@ -169,20 +174,14 @@ export default function GuideScreen() {
             <Text style={styles.emptyText}>검색 결과가 없어요.</Text>
           )}
 
-          {!isSearchMode && <Pressable
-            style={({ pressed }) => [styles.scanBanner, pressed && styles.pressed]}
-            onPress={() => router.push('/scan/camera')}>
+          {!isSearchMode && <View style={styles.scanBanner}>
             <View style={styles.bannerCopy}>
               <Text style={styles.bannerTitle}>AI로 SCAN하고{`\n`}쉽게 분리배출을 기록하자!</Text>
               <View style={styles.tagRow}>
                 {bannerTags.map((tag) => (
-                  <Pressable
-                    key={tag}
-                    accessibilityRole="text"
-                    style={styles.tag}
-                    onPress={(event) => event.stopPropagation()}>
+                  <View key={tag} style={styles.tag}>
                     <Text style={styles.tagText}>{tag}</Text>
-                  </Pressable>
+                  </View>
                 ))}
               </View>
             </View>
@@ -191,7 +190,7 @@ export default function GuideScreen() {
               style={styles.bannerArt}
               contentFit="contain"
             />
-          </Pressable>}
+          </View>}
         </View>
       </ScrollView>
 
@@ -221,7 +220,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
   },
-  searchInput: { flex: 1, height: '100%', color: '#20332B', fontSize: 16, fontFamily: 'PretendardRegular', padding: 0 },
+  // outlineStyle: 웹 브라우저가 입력창에 두르는 파란 포커스 테두리를 없앤다.
+  searchInput: { flex: 1, height: '100%', color: '#20332B', fontSize: 16, fontFamily: 'PretendardRegular', padding: 0, outlineStyle: 'none' } as object,
   heroRow: {
     minHeight: 130,
     flexDirection: 'row',
