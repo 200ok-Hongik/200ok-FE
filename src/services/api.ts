@@ -188,6 +188,7 @@ export type Region = {
 
 export type NotificationItem = {
   notificationId: number;
+  calendarId?: number;
   title: string;
   content: string;
   createdAt: string;
@@ -224,6 +225,8 @@ export type UserProfile = {
     gugun: string;
     dong: string;
   };
+  // 분리배출 알림 수신 여부. 서버가 내려주기 전(구버전 응답)에는 없을 수 있다.
+  notificationEnabled?: boolean;
 };
 
 async function request<T>(path: string, init?: RequestInit, canRetry = true): Promise<T> {
@@ -546,6 +549,15 @@ export async function completeCalendar(calendarId: number): Promise<CalendarItem
 
 export async function getProfile(): Promise<UserProfile> {
   return request<UserProfile>('/api/users/me');
+}
+
+// 분리배출 알림 수신 여부를 켜거나 끈다. 갱신된 프로필을 돌려준다.
+export async function updateNotificationEnabled(enabled: boolean): Promise<UserProfile> {
+  return request<UserProfile>('/api/users/me/notifications', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
 }
 
 export async function updateRegion(regionId: number): Promise<void> {

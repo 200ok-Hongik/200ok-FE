@@ -6,19 +6,45 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { FrequentItems } from '@/constants/mockData';
-import { getProfile, logout, type UserProfile } from '@/services/api';
+import { getProfile, logout, updateNotificationEnabled, type UserProfile } from '@/services/api';
 
 export default function MyPageScreen() {
   const [notifyOn, setNotifyOn] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSavingNotify, setIsSavingNotify] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    getProfile().then((data) => !cancelled && setProfile(data))
+    getProfile().then((data) => {
+      if (cancelled) return;
+      setProfile(data);
+      if (typeof data.notificationEnabled === 'boolean') setNotifyOn(data.notificationEnabled);
+    })
       .catch((error) => console.warn('프로필을 불러오지 못했습니다.', error));
     return () => { cancelled = true; };
   }, []);
+
+  // 스위치는 바로 반영해서 보여주고, 서버 저장에 실패하면 원래 값으로 되돌린다.
+  const handleNotifyChange = async (enabled: boolean) => {
+    if (isSavingNotify) return;
+    const previous = notifyOn;
+    setNotifyOn(enabled);
+    setNotifyError(null);
+    setIsSavingNotify(true);
+    try {
+      const updated = await updateNotificationEnabled(enabled);
+      setProfile(updated);
+      if (typeof updated.notificationEnabled === 'boolean') setNotifyOn(updated.notificationEnabled);
+    } catch (error) {
+      console.warn('알림 설정을 저장하지 못했습니다.', error);
+      setNotifyOn(previous);
+      setNotifyError('알림 설정을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsSavingNotify(false);
+    }
+  };
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -92,9 +118,10 @@ export default function MyPageScreen() {
           </Pressable>
           <View style={s.settingRow}>
             <Text style={s.settingLabel}>알림 설정</Text>
-            <Switch value={notifyOn} onValueChange={setNotifyOn}
+            <Switch value={notifyOn} onValueChange={handleNotifyChange} disabled={isSavingNotify}
               trackColor={{ true: '#36D16E', false: '#D5D5D5' }} thumbColor="#FFFFFF" style={s.switch} />
           </View>
+          {notifyError && <Text style={s.notifyError}>{notifyError}</Text>}
           <Pressable disabled={isLoggingOut} style={s.settingRow} onPress={handleLogout}>
             <Text style={s.logout}>{isLoggingOut ? '로그아웃 중…' : '로그아웃'}</Text>
           </Pressable>
@@ -105,6 +132,7 @@ export default function MyPageScreen() {
 }
 
 const s = StyleSheet.create({
+  notifyError: { marginTop: -4, marginBottom: 8, fontSize: 12, lineHeight: 17, color: '#EF4444' },
   safe: { flex: 1, backgroundColor: '#FFFFFF' },
   scroll: { paddingBottom: 28 },
   header: { height: 58, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
