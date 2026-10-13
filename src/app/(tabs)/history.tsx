@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -169,7 +169,8 @@ export default function HistoryScreen() {
     });
   }, []);
 
-  useEffect(() => {
+  // 스캔 결과를 저장하고 이 탭으로 돌아올 때마다 최신 기록을 다시 불러온다.
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
     const startDate = toDateKey(cursor.year, cursor.month, 1);
     const lastDay = new Date(cursor.year, cursor.month + 1, 0).getDate();
@@ -193,7 +194,7 @@ export default function HistoryScreen() {
     return () => {
       cancelled = true;
     };
-  }, [cursor]);
+  }, [cursor]));
 
   const entriesByDate = useMemo(() => {
     const map: Record<string, HistoryViewEntry[]> = {};

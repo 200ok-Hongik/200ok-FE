@@ -3,8 +3,6 @@ import { Platform } from 'react-native';
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://dev.ssok.store';
 export const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL ?? 'https://ssok.store';
 
-// Kakao 로그인 연동 전까지 백엔드가 요구하는 임시 사용자 ID.
-const TEMP_USER_ID = 1;
 export const KAKAO_LOGIN_URL = `${API_BASE_URL}/oauth2/authorization/kakao`;
 
 export type CategoryInfo = {
@@ -283,9 +281,10 @@ async function request<T>(path: string, init?: RequestInit, canRetry = true): Pr
   }
 }
 
-function withUserId(path: string, params: Record<string, string> = {}) {
-  const query = new URLSearchParams({ userId: String(TEMP_USER_ID), ...params });
-  return `${path}?${query.toString()}`;
+// 사용자는 로그인 쿠키로 구분하므로 userId를 쿼리에 붙이지 않는다. (스웨거에도 userId 파라미터가 없다)
+function withQuery(path: string, params: Record<string, string> = {}) {
+  const query = new URLSearchParams(params).toString();
+  return query ? `${path}?${query}` : path;
 }
 
 function completedScanResult(job: AnalysisJob): ScanUploadResult | null {
@@ -524,19 +523,19 @@ export async function getRegions(sido?: string, gugun?: string): Promise<Region[
 }
 
 export async function getHomeSummary(): Promise<HomeSummary> {
-  return request<HomeSummary>(withUserId('/api/home'));
+  return request<HomeSummary>(withQuery('/api/home'));
 }
 
 export async function getRecentNotifications(): Promise<NotificationItem[]> {
-  return request<NotificationItem[]>(withUserId('/api/notifications/recent'));
+  return request<NotificationItem[]>(withQuery('/api/notifications/recent'));
 }
 
 export async function getCalendars(startDate: string, endDate: string): Promise<CalendarItem[]> {
-  return request<CalendarItem[]>(withUserId('/api/calendars', { startDate, endDate }));
+  return request<CalendarItem[]>(withQuery('/api/calendars', { startDate, endDate }));
 }
 
 export async function createCalendar(disposalDecisionId: number, scheduledAt?: string): Promise<CalendarItem> {
-  return request<CalendarItem>(withUserId('/api/calendars'), {
+  return request<CalendarItem>(withQuery('/api/calendars'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ disposalDecisionId, ...(scheduledAt ? { scheduledAt } : {}) }),
@@ -544,7 +543,7 @@ export async function createCalendar(disposalDecisionId: number, scheduledAt?: s
 }
 
 export async function completeCalendar(calendarId: number): Promise<CalendarItem> {
-  return request<CalendarItem>(withUserId(`/api/calendars/${calendarId}/complete`), { method: 'PATCH' });
+  return request<CalendarItem>(withQuery(`/api/calendars/${calendarId}/complete`), { method: 'PATCH' });
 }
 
 export async function getProfile(): Promise<UserProfile> {

@@ -13,6 +13,7 @@ import { SsokLogo } from '@/components/ui/SsokLogo';
 import { Text } from '@/components/ui/Text';
 import { cardShadow, describeItem, ScanColors, statusBarInset } from '@/constants/scanDesign';
 import {
+  createCalendar,
   getDisposalGuide,
   getObjectDisposalGuide,
   getProfile,
@@ -68,6 +69,9 @@ export default function ScanResultScreen() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('report');
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!scanId) return;
@@ -128,8 +132,26 @@ export default function ScanResultScreen() {
     });
   }, [guide, aiCategory, vlmConfidence, confidenceReady]);
 
-  const handleSave = () => {
-    router.replace({ pathname: '/(tabs)', params: { feedback: '1', scanId: scanId ?? '' } });
+  // "정보 저장하기": 최종 분리배출 판단(decisionId)을 배출 기록(캘린더)에 저장한 뒤 홈으로 간다.
+  // 일정 시간(scheduledAt)은 보내지 않으면 서버가 우리 동네 배출 요일·시간으로 계산해 준다.
+  const handleSave = async () => {
+    if (isSaving || !guide) return;
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+      // 저장은 됐는데 이동만 실패한 경우 같은 기록이 두 번 쌓이지 않도록 한 번만 보낸다.
+      if (!isSaved) {
+        const saved = await createCalendar(guide.decisionId);
+        console.info('[SSOK] 배출 기록 저장:', saved);
+        setIsSaved(true);
+      }
+      router.replace({ pathname: '/(tabs)', params: { feedback: '1', scanId: scanId ?? '' } });
+    } catch (reason) {
+      console.error(reason);
+      setSaveError('기록을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const headerTop = statusBarInset(insets.top);
@@ -314,11 +336,13 @@ export default function ScanResultScreen() {
           </>
         )}
 
+        {saveError && <Text style={styles.saveError}>{saveError}</Text>}
         <Pressable
           accessibilityRole="button"
+          disabled={isSaving}
           onPress={handleSave}
           style={({ pressed }) => [styles.saveButton, tab === 'report' ? { marginTop: 45 } : { marginTop: 54 }, pressed && { opacity: 0.85 }]}>
-          <Text style={styles.saveText}>정보 저장하기</Text>
+          {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>정보 저장하기</Text>}
         </Pressable>
       </ScrollView>
 
@@ -488,6 +512,7 @@ const styles = StyleSheet.create({
   cautionText: { flex: 1, fontSize: 15, lineHeight: 22, color: ScanColors.ink2 },
 
   saveButton: { marginHorizontal: 16, height: 48, borderRadius: 8, backgroundColor: ScanColors.green, alignItems: 'center', justifyContent: 'center' },
+  saveError: { marginTop: 24, marginHorizontal: 16, textAlign: 'center', fontSize: 13, lineHeight: 18, color: '#EF4444' },
   saveText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
 
   ruleRow: { paddingHorizontal: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
