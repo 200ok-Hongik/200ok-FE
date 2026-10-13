@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,7 +13,7 @@ import { Card } from '@/components/ui/Card';
 import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { FrequentItems } from '@/constants/mockData';
-import { getCalendars, getHomeSummary, getProfile, submitScanFeedback, type HomeSummary, type UserProfile } from '@/services/api';
+import { completeCalendar, getCalendars, getHomeSummary, getProfile, submitScanFeedback, type HomeSummary, type UserProfile } from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -50,6 +50,8 @@ export default function HomeScreen() {
   const [homeSummary, setHomeSummary] = useState<HomeSummary | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [monthlyRecycleCount, setMonthlyRecycleCount] = useState(0);
+  const [completingId, setCompletingId] = useState<number | null>(null);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   const [today, setToday] = useState<Date | null>(null);
   const weekday = today ? WEEKDAYS[today.getDay()] : '';
   const currentMonth = today ? today.getMonth() + 1 : 0;
@@ -71,6 +73,27 @@ export default function HomeScreen() {
     } finally {
       setIsSubmittingFeedback(false);
       setFeedbackVisible(false);
+    }
+  };
+
+  // 오늘 배출 일정을 "배출 완료"로 바꾼다. 완료된 일정은 이번 달 누적 재활용 횟수에 바로 반영한다.
+  const handleCompleteSchedule = async (calendarId: number) => {
+    if (completingId != null) return;
+    try {
+      setCompletingId(calendarId);
+      setCompleteError(null);
+      await completeCalendar(calendarId);
+      setHomeSummary((current) =>
+        current
+          ? { ...current, todaySchedules: current.todaySchedules.map((item) => (item.calendarId === calendarId ? { ...item, isCompleted: true } : item)) }
+          : current
+      );
+      setMonthlyRecycleCount((count) => count + 1);
+    } catch (err) {
+      console.error(err);
+      setCompleteError('배출 완료 처리를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -121,6 +144,45 @@ export default function HomeScreen() {
         <Text style={styles.subheading}>
           {profile?.name ?? '사용자'} 님, {homeSummary?.todaySchedules.length ? '오늘은 재활용품 배출일이에요.' : '오늘 예정된 배출 일정이 없어요.'}
         </Text>
+
+        {!!homeSummary?.todaySchedules.length && (
+          <View style={styles.scheduleList}>
+            {homeSummary.todaySchedules.map((item) => {
+              const scheduled = new Date(item.scheduledAt);
+              const timeText = Number.isNaN(scheduled.getTime())
+                ? ''
+                : `${scheduled.getHours() < 12 ? '오전' : '오후'} ${scheduled.getHours() % 12 || 12}:${String(scheduled.getMinutes()).padStart(2, '0')}`;
+              return (
+                <View key={item.calendarId} style={styles.scheduleRow}>
+                  <View style={styles.scheduleCopy}>
+                    <Text style={styles.scheduleName} numberOfLines={1}>{item.categoryName}</Text>
+                    <Text style={styles.scheduleTime}>{timeText} {item.isCompleted ? '배출 완료' : '배출 예정'}</Text>
+                  </View>
+                  {item.isCompleted ? (
+                    <View style={styles.scheduleDone}>
+                      <Ionicons name="checkmark" size={14} color="#16A34A" />
+                      <Text style={styles.scheduleDoneText}>완료</Text>
+                    </View>
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.categoryName} 배출 완료`}
+                      disabled={completingId != null}
+                      onPress={() => handleCompleteSchedule(item.calendarId)}
+                      style={({ pressed }) => [styles.scheduleButton, pressed && { opacity: 0.8 }]}>
+                      {completingId === item.calendarId ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.scheduleButtonText}>배출 완료</Text>
+                      )}
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+            {completeError && <Text style={styles.scheduleError}>{completeError}</Text>}
+          </View>
+        )}
 
         <Card style={styles.scanCard}>
           <View style={styles.scanCardRow}>
@@ -217,6 +279,27 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  scheduleList: { marginTop: 14, gap: 8 },
+  scheduleRow: {
+    minHeight: 60,
+    paddingLeft: 16,
+    paddingRight: 12,
+    borderRadius: 12,
+    backgroundColor: '#F1FBF5',
+    borderWidth: 1,
+    borderColor: '#CDEFD9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  scheduleCopy: { flex: 1, paddingRight: 10 },
+  scheduleName: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: '#111827' },
+  scheduleTime: { marginTop: 2, fontSize: 12, lineHeight: 16, color: '#6B7280' },
+  scheduleButton: { minWidth: 76, height: 36, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center' },
+  scheduleButtonText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  scheduleDone: { height: 36, paddingHorizontal: 12, borderRadius: 10, backgroundColor: '#DCFCE7', flexDirection: 'row', alignItems: 'center', gap: 4 },
+  scheduleDoneText: { fontSize: 13, fontWeight: '700', color: '#16A34A' },
+  scheduleError: { fontSize: 12, lineHeight: 17, color: '#EF4444', textAlign: 'center' },
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { paddingHorizontal: 16, paddingBottom: 18 },
   header: {
