@@ -17,7 +17,7 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="manifest" href="/manifest.webmanifest" />
         <ScrollViewStyleReset />
         {/* 앱처럼 쓰는 화면이라 핀치 확대와 가장자리 끌림(바운스)을 막는다. */}
-        <style dangerouslySetInnerHTML={{ __html: 'html,body{overscroll-behavior:none;touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;}' }} />
+        <style dangerouslySetInnerHTML={{ __html: 'html,body{overscroll-behavior:none;touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;}video::-webkit-media-controls,video::-webkit-media-controls-enclosure,video::-webkit-media-controls-panel,video::-webkit-media-controls-start-playback-button,video::-webkit-media-controls-overlay-play-button{display:none!important;opacity:0!important;pointer-events:none!important;-webkit-appearance:none;}' }} />
         <script
           dangerouslySetInnerHTML={{
             __html:

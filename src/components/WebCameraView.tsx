@@ -184,12 +184,18 @@ export function WebCameraView({ ref, onReady, onError }: Props) {
         autoPlay: true,
         playsInline: true,
         muted: true,
+        // 재생/정지 컨트롤, 화면 속 화면(PiP), 에어플레이 버튼이 영상 위에 뜨지 않게 한다.
+        controls: false,
+        disablePictureInPicture: true,
+        disableRemotePlayback: true,
+        'x-webkit-airplay': 'deny',
         style: {
           width: '100%',
           height: '100%',
           objectFit: 'cover',
           display: 'block',
           backgroundColor: '#000000',
+          pointerEvents: 'none',
           transform: mirrored ? 'scaleX(-1)' : 'none',
         },
       })}
