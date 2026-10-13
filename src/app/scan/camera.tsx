@@ -336,9 +336,10 @@ export default function ScanCameraScreen() {
 
   // 디자인 기준 위치: 카드 상단 y=64(상태바 아래 20), 기본 뷰파인더 상단 y=229
   const cardsTop = Math.max(insets.top, 44) + 20;
-  // 뷰파인더는 카드/점 표시 아래부터 셔터 버튼 위까지의 빈 공간 안에서만 잡는다. (화면이 낮으면 그만큼 줄어든다)
+  // 뷰파인더는 화면 위쪽부터 셔터 버튼 위까지의 공간 안에서만 잡는다. (화면이 낮으면 그만큼 줄어든다)
   const shutterTop = screen.height - (tabBarHeight + 14 + SHUTTER_SIZE);
-  const finderTop = cardsTop + 130;
+  // 카드는 인식이 끝난 뒤에만 나오므로, 촬영 전·분석 중 뷰파인더는 카드 자리까지 올려서 잡는다.
+  const finderTop = cardsTop + 40;
   const finderHeight = Math.max(MIN_BOX_HEIGHT, Math.min(VIEWFINDER_HEIGHT, shutterTop - 16 - finderTop));
   const finderWidth = Math.min(VIEWFINDER_WIDTH, screen.width - 48);
   const defaultBox: Box = {
