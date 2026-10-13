@@ -138,7 +138,7 @@ export default function OnboardingScreen() {
             onPress={handleKakaoLogin}
           />
 
-          <Text style={styles.link} onPress={() => router.push('/setting')}>
+          <Text style={styles.link} onPress={() => router.push('/help')}>
             로그인·회원가입 문의  〉
           </Text>
           </View>

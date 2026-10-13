@@ -30,6 +30,7 @@ export default function RootLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="setting" />
+      <Stack.Screen name="help" />
       <Stack.Screen name="oauth/callback" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="scan/camera" options={{ animation: 'fade' }} />
