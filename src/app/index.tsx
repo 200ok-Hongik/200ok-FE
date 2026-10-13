@@ -34,8 +34,9 @@ export default function OnboardingScreen() {
       `${FRONTEND_URL}/oauth/callback`
     );
     if (result.type === 'success') {
-      await getProfile();
-      router.replace('/(tabs)');
+      const profile = await getProfile();
+      // 처음 로그인해서 지역이 아직 없으면 지역 선택 화면을 먼저 보여준다.
+      router.replace(profile.region ? '/(tabs)' : '/setting');
     }
   };
 

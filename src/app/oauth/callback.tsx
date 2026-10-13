@@ -16,8 +16,9 @@ export default function OAuthCallbackScreen() {
     setError(null);
 
     getProfile()
-      .then(() => {
-        if (!cancelled) router.replace('/(tabs)');
+      .then((profile) => {
+        // 처음 로그인해서 지역이 아직 없으면 지역 선택 화면을 먼저 보여준다.
+        if (!cancelled) router.replace(profile.region ? '/(tabs)' : '/setting');
       })
       .catch((reason) => {
         console.error(reason);

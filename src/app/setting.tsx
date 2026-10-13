@@ -18,6 +18,7 @@ export default function SettingScreen() {
   const [town, setTown] = useState<string | null>(null);
   const [regions, setRegions] = useState<Region[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,14 +60,20 @@ export default function SettingScreen() {
   const handleComplete = async () => {
     if (!province || !district || !town || isSaving) return;
     const selectedRegion = regions.find((region) => region.sido === province && region.gugun === district && region.dong === town);
+    if (!selectedRegion) {
+      setErrorMessage('선택한 지역 정보를 찾지 못했어요. 지역 목록을 다시 불러온 뒤 시도해 주세요.');
+      return;
+    }
     try {
       setIsSaving(true);
-      if (selectedRegion) await updateRegion(selectedRegion.regionId);
+      setErrorMessage(null);
+      await updateRegion(selectedRegion.regionId);
+      router.replace('/(tabs)');
     } catch (error) {
-      console.warn('로그인 연결 전이라 지역 저장은 건너뜁니다.', error);
+      console.warn('지역을 저장하지 못했습니다.', error);
+      setErrorMessage('지역을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
     } finally {
       setIsSaving(false);
-      router.replace('/(tabs)');
     }
   };
 
@@ -119,6 +126,8 @@ export default function SettingScreen() {
         </View>
 
         <View style={styles.spacer} />
+
+        {errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
 
         <Button
           label={complete ? 'SSOK 시작하기' : '다음'}
@@ -198,4 +207,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   spacer: { flex: 1 },
+  errorText: { marginBottom: 12, textAlign: 'center', fontSize: 13, lineHeight: 18, color: Colors.danger },
 });
