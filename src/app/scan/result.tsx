@@ -40,6 +40,12 @@ const STATE_CHIPS: { names: string[]; label: string; icon: IconDef; step: string
   { names: ['istransparent', 'transparent'], label: '투명 확인', icon: ICONS.chipEye, step: '투명 여부 확인' },
 ];
 
+// 0~1 비율로 맞춘다. 서버가 0~100(퍼센트)으로 줄 수도 있어서 1보다 크면 100으로 나눈다. 0/없음은 null.
+function toRatio(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value) || value <= 0) return null;
+  return Math.min(1, value > 1 ? value / 100 : value);
+}
+
 function chipFor(item: CheckItem) {
   const normalized = item.checkItemName.toLowerCase().replace(/[^a-z]/g, '');
   return STATE_CHIPS.find((chip) => chip.names.includes(normalized)) ?? null;
@@ -51,6 +57,11 @@ export default function ScanResultScreen() {
   const [guide, setGuide] = useState<DisposalGuide | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [bbox, setBbox] = useState<ScanObjectSummary['bbox'] | undefined>();
+  // 신뢰도는 응답마다 다른 곳에 들어 있다. 배출 안내(guide)의 category는 "사용자가 확정한" 결과라 값이 비어(0) 올 수 있어서,
+  // AI가 처음 분석한 값(상세의 aiCategory, 목록의 vlm)을 먼저 쓴다.
+  const [aiCategory, setAiCategory] = useState<{ categoryId: number; confidence: number } | null>(null);
+  const [vlmConfidence, setVlmConfidence] = useState<number | null>(null);
+  const [confidenceReady, setConfidenceReady] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [categories, setCategories] = useState<TrashCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,12 +89,22 @@ export default function ScanResultScreen() {
 
     // 아래는 화면을 꾸미는 보조 정보라서 실패해도 결과 화면은 그대로 보여준다.
     if (objectId) {
-      getScanObject(Number(scanId), objectId)
-        .then((detail) => !cancelled && setImageUrl(detail.imageUrl))
-        .catch(() => undefined);
-      getScanObjects(Number(scanId))
-        .then((list) => !cancelled && setBbox(list.objects.find((object) => object.objectId === objectId)?.bbox))
-        .catch(() => undefined);
+      Promise.allSettled([getScanObject(Number(scanId), objectId), getScanObjects(Number(scanId))]).then(([detailResult, listResult]) => {
+        if (cancelled) return;
+        if (detailResult.status === 'fulfilled') {
+          setImageUrl(detailResult.value.imageUrl);
+          setAiCategory({
+            categoryId: detailResult.value.category.categoryId,
+            confidence: detailResult.value.category.confidence,
+          });
+        }
+        const found = listResult.status === 'fulfilled' ? listResult.value.objects.find((object) => object.objectId === objectId) : undefined;
+        setBbox(found?.bbox);
+        setVlmConfidence(found?.vlm?.confidence ?? null);
+        setConfidenceReady(true);
+      });
+    } else {
+      setConfidenceReady(true);
     }
     getProfile()
       .then((data) => !cancelled && setProfile(data))
@@ -96,6 +117,16 @@ export default function ScanResultScreen() {
       cancelled = true;
     };
   }, [scanId, objectId]);
+
+  // 신뢰도가 어디서 오는지 확인할 수 있게 후보 값을 모두 남긴다.
+  useEffect(() => {
+    if (!guide || !confidenceReady) return;
+    console.info('[SSOK AI] 신뢰도 후보:', {
+      aiCategory,
+      vlmConfidence,
+      guideCategory: { categoryId: guide.category.categoryId, confidence: guide.category.confidence, source: guide.category.categorySource },
+    });
+  }, [guide, aiCategory, vlmConfidence, confidenceReady]);
 
   const handleSave = () => {
     router.replace({ pathname: '/(tabs)', params: { feedback: '1', scanId: scanId ?? '' } });
@@ -146,9 +177,12 @@ export default function ScanResultScreen() {
 
   const localPhoto = getScanPhoto(scanId);
   const info = describeItem(guide.category.code, guide.category.name);
-  const confidence = Math.min(1, Math.max(0, guide.category.confidence));
-  const confidencePercent = Math.round(confidence * 100);
-  const filledSegments = Math.min(12, Math.floor(confidence * 11));
+  // 우선순위: AI 상세 → AI 목록(vlm) → 배출 안내. 0/없음은 "값 없음"으로 보고 다음 후보를 쓴다.
+  const confidence =
+    toRatio(aiCategory?.confidence) ?? toRatio(vlmConfidence) ?? toRatio(guide.category.confidence);
+  const isEditedByUser = !!aiCategory && aiCategory.categoryId !== guide.category.categoryId;
+  const confidencePercent = Math.round((confidence ?? 0) * 100);
+  const filledSegments = Math.min(12, Math.floor((confidence ?? 0) * 11));
   const region = profile?.region;
   const regionText = region ? `${region.sido} ${region.gugun} ${region.dong} 기준` : '우리 동네 기준';
 
@@ -171,14 +205,24 @@ export default function ScanResultScreen() {
                   <Text style={styles.reportAccent}>{info.detail}</Text>
                   <Text style={styles.reportSuffix}> 이에요!</Text>
                 </Text>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>신뢰도 {confidencePercent}%</Text>
-                </View>
-                <View style={styles.segments}>
-                  {Array.from({ length: 12 }).map((_, index) => (
-                    <View key={index} style={[styles.segment, index < filledSegments && styles.segmentOn]} />
-                  ))}
-                </View>
+                {/* 값을 모를 때 "0%"로 보이면 잘못된 정보라서, 신뢰도를 알 수 있을 때만 보여준다. */}
+                {confidenceReady && isEditedByUser && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>직접 수정한 품목</Text>
+                  </View>
+                )}
+                {confidenceReady && !isEditedByUser && confidence != null && (
+                  <>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>신뢰도 {confidencePercent}%</Text>
+                    </View>
+                    <View style={styles.segments}>
+                      {Array.from({ length: 12 }).map((_, index) => (
+                        <View key={index} style={[styles.segment, index < filledSegments && styles.segmentOn]} />
+                      ))}
+                    </View>
+                  </>
+                )}
               </View>
             </View>
 
