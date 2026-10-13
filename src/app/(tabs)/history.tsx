@@ -9,8 +9,7 @@ import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors } from '@/constants/theme';
-import { HistoryEntries } from '@/constants/mockData';
-import { getCalendars } from '@/services/api';
+import { getScanHistory } from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const YEARS = Array.from({ length: 21 }, (_, index) => 2020 + index);
@@ -152,9 +151,8 @@ export default function HistoryScreen() {
   const [typeError, setTypeError] = useState(false);
   const [isClean, setIsClean] = useState(true);
   const [separationStatus, setSeparationStatus] = useState<'완료' | '안 함' | '해당 없음'>('해당 없음');
-  const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>(
-    HistoryEntries.map((entry, index) => ({ ...entry, id: `mock-${index}`, isCompleted: true }))
-  );
+  const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>([]);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     const localToday = new Date();
@@ -175,22 +173,38 @@ export default function HistoryScreen() {
     const startDate = toDateKey(cursor.year, cursor.month, 1);
     const lastDay = new Date(cursor.year, cursor.month + 1, 0).getDate();
     const endDate = toDateKey(cursor.year, cursor.month, lastDay);
-    getCalendars(startDate, endDate)
-      .then((items) => {
+    // 월 범위로 한 번 받아 두고, 날짜를 고를 때는 받은 목록을 날짜별로 걸러서 쓴다.
+    getScanHistory(startDate, endDate)
+      .then((scans) => {
         if (cancelled) return;
-        setHistoryEntries(items.map((item) => {
-          const scheduled = new Date(item.scheduledAt);
-          return {
-            id: String(item.calendarId),
-            date: `${scheduled.getFullYear()}-${String(scheduled.getMonth() + 1).padStart(2, '0')}-${String(scheduled.getDate()).padStart(2, '0')}`,
-            time: `${String(scheduled.getHours()).padStart(2, '0')}:${String(scheduled.getMinutes()).padStart(2, '0')}`,
-            itemLabel: item.categoryName,
-            method: item.isCompleted ? `${item.categoryName} 분리배출 완료` : `${item.categoryName} 분리배출 예정`,
-            isCompleted: item.isCompleted,
-          };
-        }));
+        setLoadError(false);
+        setHistoryEntries(
+          scans.flatMap((scan) => {
+            const scanned = new Date(scan.scannedAt);
+            if (Number.isNaN(scanned.getTime())) return [];
+            const date = toDateKey(scanned.getFullYear(), scanned.getMonth(), scanned.getDate());
+            const time = `${String(scanned.getHours()).padStart(2, '0')}:${String(scanned.getMinutes()).padStart(2, '0')}`;
+            // 한 번 찍은 사진에 물건이 여러 개면 물건마다 기록 한 줄로 보여준다.
+            return scan.items.map((item): HistoryViewEntry => {
+              const name = item.category?.name || '알 수 없는 품목';
+              return {
+                id: `${scan.scanResultId}-${item.objectId}`,
+                date,
+                time,
+                itemLabel: name,
+                method: `${name} 스캔 · ${item.isConfirmed ? '확인 완료' : '확인 전'}`,
+                isCompleted: true,
+              };
+            });
+          })
+        );
       })
-      .catch((error) => console.warn('캘린더 API를 불러오지 못해 확인용 데이터를 표시합니다.', error));
+      .catch((error) => {
+        console.warn('스캔 기록을 불러오지 못했습니다.', error);
+        if (cancelled) return;
+        setLoadError(true);
+        setHistoryEntries([]);
+      });
     return () => {
       cancelled = true;
     };
@@ -333,7 +347,7 @@ export default function HistoryScreen() {
           </View>
           <View style={styles.entryList}>
             {selectedEntries.length === 0 ? (
-              <Text style={styles.emptyText}>이날은 분리배출 기록이 없어요.</Text>
+              <Text style={styles.emptyText}>{loadError ? '기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.' : '이날은 분리배출 기록이 없어요.'}</Text>
             ) : (
               selectedEntries.map((entry) => (
                 <View key={entry.id} style={styles.entryRow}>

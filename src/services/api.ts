@@ -176,6 +176,23 @@ export type ScanObjectList = {
   additionalObjects: Record<string, unknown>[];
 };
 
+// 기록 탭용 월별 스캔 기록 (GET /api/scans). 스캔 분석이 끝나면 서버가 바로 만들어 주고,
+// 배출 일정(/api/calendars)과는 별개다.
+export type ScanHistoryItem = {
+  objectId: string;
+  category: Partial<CategoryInfo> | null;
+  isConfirmed: boolean;
+  decisionId: number | null;
+  isPass: boolean | null;
+};
+
+export type ScanHistoryEntry = {
+  scanResultId: number;
+  imageUrl: string | null;
+  scannedAt: string;
+  items: ScanHistoryItem[];
+};
+
 export type Region = {
   regionId: number;
   regionCode: string;
@@ -426,6 +443,11 @@ export async function submitAnalysisFeedback(
   });
   console.info('[SSOK AI] 결과 확정 응답:', result);
   return result;
+}
+
+export async function getScanHistory(startDate: string, endDate: string): Promise<ScanHistoryEntry[]> {
+  const result = await request<ScanHistoryEntry[]>(withQuery('/api/scans', { startDate, endDate }));
+  return (result ?? []).map((entry) => ({ ...entry, items: entry.items ?? [] }));
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
