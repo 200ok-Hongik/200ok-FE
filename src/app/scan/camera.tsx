@@ -394,7 +394,7 @@ export default function ScanCameraScreen() {
       )}
 
       {/* 디자인의 위/아래 어둠 그라데이션 */}
-      <LinearGradient colors={['rgba(0,0,0,1)', 'rgba(0,0,0,0)']} style={styles.topShade} />
+      <LinearGradient colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']} style={styles.topShade} />
 
       {phase !== 'recognized' && !isUploading && (
         <Viewfinder box={defaultBox} />
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.scanDark, overflow: 'hidden' },
   permissionFallback: { alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
   permissionText: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm },
-  topShade: { position: 'absolute', top: 0, left: 0, right: 0, height: 233, pointerEvents: 'none' },
+  topShade: { position: 'absolute', top: 0, left: 0, right: 0, height: 170, pointerEvents: 'none' },
 
   cardsArea: { position: 'absolute', left: 0, right: 0 },
   card: {
