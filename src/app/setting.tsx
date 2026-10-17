@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, StyleSheet, View } from 'react-native';
@@ -13,6 +13,8 @@ import { RegionData } from '@/constants/mockData';
 import { getRegions, updateRegion, type Region } from '@/services/api';
 
 export default function SettingScreen() {
+  // 로그인 직후 처음 지역을 고르는 경우(first=1)에는 저장 후 홈에서 안내 팝업을 보여준다. 마이페이지의 지역 변경은 그대로 홈으로만 간다.
+  const { first } = useLocalSearchParams<{ first?: string }>();
   const [province, setProvince] = useState<string | null>(null);
   const [district, setDistrict] = useState<string | null>(null);
   const [town, setTown] = useState<string | null>(null);
@@ -68,7 +70,8 @@ export default function SettingScreen() {
       setIsSaving(true);
       setErrorMessage(null);
       await updateRegion(selectedRegion.regionId);
-      router.replace('/(tabs)');
+      if (first === '1') router.replace({ pathname: '/(tabs)', params: { welcome: '1' } });
+      else router.replace('/(tabs)');
     } catch (error) {
       console.warn('지역을 저장하지 못했습니다.', error);
       setErrorMessage('지역을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.');

@@ -10,8 +10,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FeedbackModal } from '@/components/scan/FeedbackModal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { WelcomeModal } from '@/components/home/WelcomeModal';
 import { ScanSheet } from '@/components/scan/ScanSheet';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { CATEGORY_ICONS } from '@/constants/categoryIcons';
@@ -40,23 +40,8 @@ function RecyclingArt() {
   );
 }
 
-function ReminderArt() {
-  return (
-    <View style={styles.reminderArtWrap}>
-      <View style={styles.reminderGlowOne} />
-      <View style={styles.reminderGlowTwo} />
-      <View style={styles.reminderBlockOne} />
-      <View style={styles.reminderBlockTwo} />
-      <View style={styles.reminderPhone}>
-        <View style={styles.reminderPhoneShine} />
-        <View style={styles.reminderPhoneBar} />
-      </View>
-    </View>
-  );
-}
-
 export default function HomeScreen() {
-  const { feedback, scanId } = useLocalSearchParams<{ feedback?: string; scanId?: string }>();
+  const { feedback, scanId, welcome } = useLocalSearchParams<{ feedback?: string; scanId?: string; welcome?: string }>();
   const [reminderVisible, setReminderVisible] = useState(false);
   const [feedbackVisible, setFeedbackVisible] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
@@ -127,6 +112,14 @@ export default function HomeScreen() {
       setCompletingId(null);
     }
   };
+
+  // 로그인(처음이면 지역 설정까지) 직후에만 안내 팝업을 한 번 보여준다.
+  useEffect(() => {
+    if (welcome === '1') {
+      setReminderVisible(true);
+      router.setParams({ welcome: undefined });
+    }
+  }, [welcome]);
 
   useEffect(() => {
     if (feedback === '1') {
@@ -301,37 +294,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <OverlayModal visible={reminderVisible} animationType="fade">
-        <View style={styles.reminderBackdrop}>
-          <View style={styles.reminderCard}>
-            <ReminderArt />
-            <Text style={styles.reminderTitle}>오늘은 분리배출 하는 날!</Text>
-            <Text style={styles.reminderDesc}>버리기 전 AI로 스캔하고,{'\n'}올바르게 분리배출해 주세요.</Text>
-            <Button
-              label="확인"
-              onPress={() => setReminderVisible(false)}
-              style={styles.reminderButton}
-              labelStyle={styles.reminderButtonLabel}
-            />
-
-            <Pressable
-              style={styles.reminderScanRow}
-              onPress={() => {
-                setReminderVisible(false);
-                router.push('/scan/camera');
-              }}>
-              <View style={styles.reminderScanIcon}>
-                <Ionicons name="camera" size={20} color={Colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.reminderScanTitle}>AI 분리배출 스캔</Text>
-                <Text style={styles.reminderScanDesc}>물건을 촬영하면{'\n'}배출 방법을 알려드려요.</Text>
-              </View>
-              <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </View>
-      </OverlayModal>
+      <WelcomeModal visible={reminderVisible} onClose={() => setReminderVisible(false)} />
 
       <ScanSheet
         visible={notificationsOpen}
@@ -488,114 +451,5 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '500',
   },
-
-  reminderBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(7, 18, 13, 0.82)',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  reminderCard: { flex: 1, width: '100%', alignItems: 'center', paddingTop: 190 },
-  reminderArtWrap: {
-    width: 150,
-    height: 140,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  reminderGlowOne: {
-    position: 'absolute',
-    width: 150,
-    height: 34,
-    borderRadius: 50,
-    backgroundColor: 'rgba(34,197,94,0.12)',
-    transform: [{ rotate: '8deg' }],
-  },
-  reminderGlowTwo: {
-    position: 'absolute',
-    width: 110,
-    height: 30,
-    borderRadius: 40,
-    backgroundColor: 'rgba(34,197,94,0.1)',
-    transform: [{ rotate: '-15deg' }],
-  },
-  reminderBlockOne: {
-    position: 'absolute',
-    right: 24,
-    top: 27,
-    width: 38,
-    height: 38,
-    borderRadius: 3,
-    backgroundColor: '#00E49B',
-  },
-  reminderBlockTwo: {
-    position: 'absolute',
-    left: 39,
-    top: 48,
-    width: 47,
-    height: 47,
-    borderRadius: 3,
-    backgroundColor: 'rgba(212,255,241,0.72)',
-  },
-  reminderPhone: {
-    width: 56,
-    height: 86,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.45)',
-    backgroundColor: 'rgba(184,200,194,0.7)',
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingBottom: 5,
-  },
-  reminderPhoneShine: {
-    position: 'absolute',
-    top: -6,
-    left: -12,
-    width: 42,
-    height: 86,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    transform: [{ rotate: '18deg' }],
-  },
-  reminderPhoneBar: { width: 28, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
-  reminderTitle: { color: '#FFFFFF', fontSize: 19, lineHeight: 24, fontWeight: '800' },
-  reminderDesc: {
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
-    marginTop: 7,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  reminderButton: { marginTop: 14, width: 186, height: 50, borderRadius: 7 },
-  reminderButtonLabel: { fontSize: 14, lineHeight: 18, fontWeight: '700' },
-  reminderScanRow: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 86,
-    minHeight: 110,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    backgroundColor: 'rgba(7, 58, 39, 0.78)',
-    borderRadius: 14,
-    padding: 16,
-  },
-  reminderScanIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reminderScanTitle: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
-  reminderScanDesc: { color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 16, marginTop: 3 },
 
 });

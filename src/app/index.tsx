@@ -35,8 +35,9 @@ export default function OnboardingScreen() {
     );
     if (result.type === 'success') {
       const profile = await getProfile();
-      // 처음 로그인해서 지역이 아직 없으면 지역 선택 화면을 먼저 보여준다.
-      router.replace(profile.region ? '/(tabs)' : '/setting');
+      // 처음 로그인해서 지역이 아직 없으면 지역 선택 화면을 먼저, 이미 있으면 바로 홈(안내 팝업 포함)으로 간다.
+      if (profile.region) router.replace({ pathname: '/(tabs)', params: { welcome: '1' } });
+      else router.replace({ pathname: '/setting', params: { first: '1' } });
     }
   };
 
