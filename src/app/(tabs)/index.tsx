@@ -15,10 +15,10 @@ import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { CATEGORY_ICONS } from '@/constants/categoryIcons';
 import {
   completeCalendar,
-  getCalendars,
   getFrequentScanCategories,
   getHomeSummary,
   getProfile,
+  getScanHistory,
   submitScanFeedback,
   type FrequentScanCategory,
   type HomeSummary,
@@ -101,7 +101,6 @@ export default function HomeScreen() {
           ? { ...current, todaySchedules: current.todaySchedules.map((item) => (item.calendarId === calendarId ? { ...item, isCompleted: true } : item)) }
           : current
       );
-      setMonthlyRecycleCount((count) => count + 1);
     } catch (err) {
       console.error(err);
       setCompleteError('배출 완료 처리를 하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -126,15 +125,21 @@ export default function HomeScreen() {
     const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const endDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`;
 
-    Promise.all([getHomeSummary(), getProfile(), getCalendars(startDate, endDate)])
-      .then(([summary, userProfile, calendars]) => {
+    Promise.all([getHomeSummary(), getProfile()])
+      .then(([summary, userProfile]) => {
         if (!cancelled) {
           setHomeSummary(summary);
           setProfile(userProfile);
-          setMonthlyRecycleCount(calendars.filter((item) => item.isCompleted).length);
         }
       })
       .catch((error) => console.warn('홈 API를 불러오지 못했습니다.', error));
+
+    // "N월 누적 재활용": 이번 달 스캔 기록(물건 수)을 센다. 기록 탭에 보이는 개수와 같은 기준이다.
+    getScanHistory(startDate, endDate)
+      .then((scans) => {
+        if (!cancelled) setMonthlyRecycleCount(scans.reduce((total, scan) => total + scan.items.length, 0));
+      })
+      .catch((error) => console.warn('이번 달 스캔 기록을 불러오지 못했습니다.', error));
 
     // 내가 스캔한 기록에서 많이 나온 품목 순서대로 보여준다. (홈 요약과 따로 불러서 한쪽이 실패해도 다른 쪽은 보인다)
     setIsFrequentLoading(true);
