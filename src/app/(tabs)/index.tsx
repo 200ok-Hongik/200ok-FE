@@ -12,7 +12,10 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { ScanSheet } from '@/components/scan/ScanSheet';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 import { CATEGORY_ICONS } from '@/constants/categoryIcons';
+import { getLastSeenNotificationId, setLastSeenNotificationId } from '@/services/notificationSeen';
 import {
   completeCalendar,
   getFrequentScanCategories,
@@ -61,6 +64,8 @@ export default function HomeScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [monthlyRecycleCount, setMonthlyRecycleCount] = useState(0);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [lastSeenNotificationId, setLastSeenId] = useState(0);
   const [frequentItems, setFrequentItems] = useState<FrequentScanCategory[]>([]);
   const [isFrequentLoading, setIsFrequentLoading] = useState(true);
   const [frequentError, setFrequentError] = useState(false);
@@ -71,7 +76,21 @@ export default function HomeScreen() {
 
   useEffect(() => {
     setToday(new Date());
+    setLastSeenId(getLastSeenNotificationId());
   }, []);
+
+  // 마지막으로 확인한 번호보다 큰 알림이 있을 때만 종에 빨간 점을 띄운다.
+  const notifications = homeSummary?.recentNotifications ?? [];
+  const latestNotificationId = notifications.reduce((max, item) => Math.max(max, item.notificationId), 0);
+  const hasUnreadNotification = latestNotificationId > lastSeenNotificationId;
+
+  const openNotifications = () => {
+    setNotificationsOpen(true);
+    if (latestNotificationId > lastSeenNotificationId) {
+      setLastSeenNotificationId(latestNotificationId);
+      setLastSeenId(latestNotificationId);
+    }
+  };
 
   const handleFeedback = async (isAccurate: boolean) => {
     if (!scanId || isSubmittingFeedback) {
@@ -168,10 +187,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <SsokLogo width={78} />
-          <View style={styles.notificationWrap}>
-            <Ionicons name="notifications" size={22} color="#198B55" />
-            <View style={styles.notificationDot} />
-          </View>
+          <NotificationBell hasUnread={hasUnreadNotification} onPress={openNotifications} />
         </View>
 
         <Text style={styles.heading}>
@@ -317,6 +333,33 @@ export default function HomeScreen() {
         </View>
       </OverlayModal>
 
+      <ScanSheet
+        visible={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        title="알림"
+        subtitle="최근 알림 10건을 보여드려요."
+        minHeight={300}>
+        <View style={styles.notificationList}>
+          {notifications.length === 0 ? (
+            <Text style={styles.notificationEmpty}>받은 알림이 없어요.</Text>
+          ) : (
+            notifications.map((item) => {
+              const created = new Date(item.createdAt);
+              const when = Number.isNaN(created.getTime())
+                ? ''
+                : `${created.getMonth() + 1}.${created.getDate()} ${String(created.getHours()).padStart(2, '0')}:${String(created.getMinutes()).padStart(2, '0')}`;
+              return (
+                <View key={item.notificationId} style={styles.notificationItem}>
+                  <Text style={styles.notificationTitle}>{item.title}</Text>
+                  {!!item.content && <Text style={styles.notificationContent}>{item.content}</Text>}
+                  {!!when && <Text style={styles.notificationTime}>{when}</Text>}
+                </View>
+              );
+            })
+          )}
+        </View>
+      </ScanSheet>
+
       <FeedbackModal visible={feedbackVisible} loading={isSubmittingFeedback} onAnswer={handleFeedback} />
     </SafeAreaView>
   );
@@ -355,18 +398,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   logo: { color: '#20B56B', fontSize: 23, lineHeight: 28, fontWeight: '800', letterSpacing: -1.4 },
-  notificationWrap: { width: 24, height: 26, alignItems: 'center', justifyContent: 'center' },
-  notificationDot: {
-    position: 'absolute',
-    top: 1,
-    right: 1,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#F46D75',
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
-  },
+  notificationList: { marginTop: 18, paddingBottom: 24 },
+  notificationEmpty: { paddingVertical: 28, textAlign: 'center', fontSize: 14, color: '#6B7280' },
+  notificationItem: { paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  notificationTitle: { fontSize: 15, lineHeight: 21, fontWeight: '700', color: '#111827' },
+  notificationContent: { marginTop: 3, fontSize: 13, lineHeight: 19, color: '#505050' },
+  notificationTime: { marginTop: 6, fontSize: 12, color: '#9CA3AF' },
   heading: { marginTop: 14, fontSize: 26, lineHeight: 33, fontWeight: '800', color: Colors.text, letterSpacing: -0.8 },
   headingAccent: { color: Colors.primaryDark },
   subheading: {
