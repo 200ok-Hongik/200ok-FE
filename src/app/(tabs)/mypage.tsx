@@ -1,12 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ComponentProps } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
-import { FrequentItems } from '@/constants/mockData';
-import { getProfile, logout, updateNotificationEnabled, type UserProfile } from '@/services/api';
+import {
+  getFrequentScanCategories,
+  getProfile,
+  logout,
+  updateNotificationEnabled,
+  type FrequentScanCategory,
+  type UserProfile,
+} from '@/services/api';
+
+type IoniconName = ComponentProps<typeof Ionicons>['name'];
+
+const CATEGORY_ICONS: Record<string, IoniconName> = {
+  CLEAR_PET_BOTTLE: 'water-outline',
+  PLASTIC: 'flask-outline',
+  CAN: 'cube-outline',
+  GLASS_BOTTLE: 'wine-outline',
+  VINYL: 'bag-handle-outline',
+  PAPER: 'document-text-outline',
+  PAPER_PACK: 'file-tray-outline',
+  STYROFOAM: 'cube-outline',
+};
 
 export default function MyPageScreen() {
   const [notifyOn, setNotifyOn] = useState(true);
@@ -14,6 +33,9 @@ export default function MyPageScreen() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingNotify, setIsSavingNotify] = useState(false);
   const [notifyError, setNotifyError] = useState<string | null>(null);
+  const [frequentItems, setFrequentItems] = useState<FrequentScanCategory[]>([]);
+  const [isFrequentLoading, setIsFrequentLoading] = useState(true);
+  const [frequentError, setFrequentError] = useState(false);
 
   // 프로필 수정·지역 변경 화면에서 돌아올 때마다 최신 정보를 다시 불러온다.
   useFocusEffect(useCallback(() => {
@@ -24,6 +46,23 @@ export default function MyPageScreen() {
       if (typeof data.notificationEnabled === 'boolean') setNotifyOn(data.notificationEnabled);
     })
       .catch((error) => console.warn('프로필을 불러오지 못했습니다.', error));
+
+    setIsFrequentLoading(true);
+    getFrequentScanCategories()
+      .then((items) => {
+        if (cancelled) return;
+        setFrequentItems(items);
+        setFrequentError(false);
+      })
+      .catch((error) => {
+        console.warn('자주 스캔한 항목을 불러오지 못했습니다.', error);
+        if (cancelled) return;
+        setFrequentItems([]);
+        setFrequentError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsFrequentLoading(false);
+      });
     return () => { cancelled = true; };
   }, []));
 
@@ -98,16 +137,24 @@ export default function MyPageScreen() {
         </View>
 
         <Text style={s.sectionTitle}>자주 스캔한 항목</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.frequentRow}>
-          {FrequentItems.map((item) => (
-            <View key={item.id} style={s.frequentItem}>
-              <View style={s.frequentIcon}>
-                <Ionicons name={item.icon} size={21} color="#171717" />
+        {isFrequentLoading ? (
+          <Text style={s.frequentEmpty}>스캔 기록을 불러오고 있어요…</Text>
+        ) : frequentError ? (
+          <Text style={s.frequentEmpty}>스캔 기록을 불러오지 못했어요.</Text>
+        ) : frequentItems.length === 0 ? (
+          <Text style={s.frequentEmpty}>아직 스캔한 항목이 없어요.</Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.frequentRow}>
+            {frequentItems.map((item) => (
+              <View key={item.categoryId} style={s.frequentItem}>
+                <View style={s.frequentIcon}>
+                  <Ionicons name={CATEGORY_ICONS[item.code] ?? 'scan-outline'} size={21} color="#171717" />
+                </View>
+                <Text style={s.frequentLabel} numberOfLines={1}>{item.name}</Text>
               </View>
-              <Text style={s.frequentLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </ScrollView>
+            ))}
+          </ScrollView>
+        )}
 
         <View style={s.divider} />
         <Text style={[s.sectionTitle, s.settingsTitle]}>설정 및 관리</Text>
@@ -157,6 +204,7 @@ const s = StyleSheet.create({
   frequentItem: { width: 64, alignItems: 'center' },
   frequentIcon: { width: 64, height: 64, borderRadius: 8, backgroundColor: '#E4F7F0', alignItems: 'center', justifyContent: 'center' },
   frequentLabel: { marginTop: 10, fontSize: 12, color: '#333333' },
+  frequentEmpty: { marginTop: 26, marginHorizontal: 16, fontSize: 13, color: '#777777' },
   divider: { height: 7, marginTop: 39, backgroundColor: '#F0F0F0' },
   settingsTitle: { marginTop: 40 },
   settingsList: { marginTop: 25, marginHorizontal: 16, gap: 8 },

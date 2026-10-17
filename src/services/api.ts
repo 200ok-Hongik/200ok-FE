@@ -193,6 +193,13 @@ export type ScanHistoryEntry = {
   items: ScanHistoryItem[];
 };
 
+export type FrequentScanCategory = {
+  categoryId: number;
+  code: string;
+  name: string;
+  count: number;
+};
+
 export type Region = {
   regionId: number;
   regionCode: string;
@@ -448,6 +455,36 @@ export async function submitAnalysisFeedback(
 export async function getScanHistory(startDate: string, endDate: string): Promise<ScanHistoryEntry[]> {
   const result = await request<ScanHistoryEntry[]>(withQuery('/api/scans', { startDate, endDate }));
   return (result ?? []).map((entry) => ({ ...entry, items: entry.items ?? [] }));
+}
+
+// Swagger에는 자주 스캔한 품목 전용 API가 없어서 GET /api/scans의 사용자 기록을
+// 카테고리별로 집계한다. 실제 기록에 등장한 품목만 빈도순으로 반환한다.
+export async function getFrequentScanCategories(limit = 5): Promise<FrequentScanCategory[]> {
+  const now = new Date();
+  const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const scans = await getScanHistory('2000-01-01', endDate);
+  const counts = new Map<number, FrequentScanCategory>();
+
+  scans.forEach((scan) => {
+    scan.items.forEach((item) => {
+      const categoryId = Number(item.category?.categoryId);
+      const code = item.category?.code?.trim();
+      const name = item.category?.name?.trim();
+      if (!Number.isFinite(categoryId) || categoryId <= 0 || !code || !name || code === 'UNKNOWN') return;
+
+      const current = counts.get(categoryId);
+      counts.set(categoryId, {
+        categoryId,
+        code,
+        name,
+        count: (current?.count ?? 0) + 1,
+      });
+    });
+  });
+
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ko'))
+    .slice(0, limit);
 }
 
 export async function getScan(scanId: number): Promise<ScanDetail> {
