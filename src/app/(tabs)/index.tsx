@@ -12,8 +12,18 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { OverlayModal } from '@/components/ui/OverlayModal';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
-import { FrequentItems } from '@/constants/mockData';
-import { completeCalendar, getCalendars, getHomeSummary, getProfile, submitScanFeedback, type HomeSummary, type UserProfile } from '@/services/api';
+import { CATEGORY_ICONS } from '@/constants/categoryIcons';
+import {
+  completeCalendar,
+  getCalendars,
+  getFrequentScanCategories,
+  getHomeSummary,
+  getProfile,
+  submitScanFeedback,
+  type FrequentScanCategory,
+  type HomeSummary,
+  type UserProfile,
+} from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -51,6 +61,9 @@ export default function HomeScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [monthlyRecycleCount, setMonthlyRecycleCount] = useState(0);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  const [frequentItems, setFrequentItems] = useState<FrequentScanCategory[]>([]);
+  const [isFrequentLoading, setIsFrequentLoading] = useState(true);
+  const [frequentError, setFrequentError] = useState(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
   const [today, setToday] = useState<Date | null>(null);
   const weekday = today ? WEEKDAYS[today.getDay()] : '';
@@ -122,6 +135,24 @@ export default function HomeScreen() {
         }
       })
       .catch((error) => console.warn('홈 API를 불러오지 못했습니다.', error));
+
+    // 내가 스캔한 기록에서 많이 나온 품목 순서대로 보여준다. (홈 요약과 따로 불러서 한쪽이 실패해도 다른 쪽은 보인다)
+    setIsFrequentLoading(true);
+    getFrequentScanCategories()
+      .then((items) => {
+        if (cancelled) return;
+        setFrequentItems(items);
+        setFrequentError(false);
+      })
+      .catch((error) => {
+        console.warn('자주 스캔한 항목을 불러오지 못했습니다.', error);
+        if (cancelled) return;
+        setFrequentItems([]);
+        setFrequentError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsFrequentLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -225,20 +256,28 @@ export default function HomeScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>자주 스캔한 항목</Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.frequentScroller}
-          contentContainerStyle={styles.frequentRow}>
-          {FrequentItems.map((item) => (
-            <View key={item.id} style={styles.frequentItem}>
-              <View style={styles.frequentIconWrap}>
-                <Ionicons name={item.icon} size={23} color="#171C1A" />
+        {isFrequentLoading ? (
+          <Text style={styles.frequentEmpty}>스캔 기록을 불러오고 있어요…</Text>
+        ) : frequentError ? (
+          <Text style={styles.frequentEmpty}>스캔 기록을 불러오지 못했어요.</Text>
+        ) : frequentItems.length === 0 ? (
+          <Text style={styles.frequentEmpty}>아직 스캔한 항목이 없어요.</Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.frequentScroller}
+            contentContainerStyle={styles.frequentRow}>
+            {frequentItems.map((item) => (
+              <View key={item.categoryId} style={styles.frequentItem}>
+                <View style={styles.frequentIconWrap}>
+                  <Ionicons name={CATEGORY_ICONS[item.code] ?? 'scan-outline'} size={23} color="#171C1A" />
+                </View>
+                <Text style={styles.frequentLabel} numberOfLines={1}>{item.name}</Text>
               </View>
-              <Text style={styles.frequentLabel}>{item.label}</Text>
-            </View>
-          ))}
-        </ScrollView>
+            ))}
+          </ScrollView>
+        )}
       </ScrollView>
 
       <OverlayModal visible={reminderVisible} animationType="fade">
@@ -279,6 +318,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  frequentEmpty: { marginTop: 14, fontSize: 13, color: '#777777' },
   scheduleList: { marginTop: 14, gap: 8 },
   scheduleRow: {
     minHeight: 60,

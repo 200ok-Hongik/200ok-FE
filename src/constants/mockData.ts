@@ -84,11 +84,3 @@ export const HistoryEntries: HistoryEntry[] = [
   { date: '2026-07-21', time: '17:00', itemLabel: '페트병', method: '뚜껑, 라벨 제거 후 분리배출' },
   { date: '2026-07-26', time: '11:20', itemLabel: '유리병', method: '뚜껑 제거 후 분리배출' },
 ];
-
-export const FrequentItems = [
-  { id: 'pet', label: '페트병', icon: 'water-outline' as const },
-  { id: 'glass', label: '유리병', icon: 'wine-outline' as const },
-  { id: 'can', label: '캔', icon: 'cube-outline' as const },
-  { id: 'paper', label: '종이류', icon: 'document-text-outline' as const },
-  { id: 'plastic', label: '플라스틱', icon: 'flask-outline' as const },
-];

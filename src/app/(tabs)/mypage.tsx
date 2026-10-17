@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState, type ComponentProps } from 'react';
+import { useCallback, useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
+import { CATEGORY_ICONS } from '@/constants/categoryIcons';
 import {
   getFrequentScanCategories,
   getProfile,
@@ -14,18 +15,6 @@ import {
   type UserProfile,
 } from '@/services/api';
 
-type IoniconName = ComponentProps<typeof Ionicons>['name'];
-
-const CATEGORY_ICONS: Record<string, IoniconName> = {
-  CLEAR_PET_BOTTLE: 'water-outline',
-  PLASTIC: 'flask-outline',
-  CAN: 'cube-outline',
-  GLASS_BOTTLE: 'wine-outline',
-  VINYL: 'bag-handle-outline',
-  PAPER: 'document-text-outline',
-  PAPER_PACK: 'file-tray-outline',
-  STYROFOAM: 'cube-outline',
-};
 
 export default function MyPageScreen() {
   const [notifyOn, setNotifyOn] = useState(true);
