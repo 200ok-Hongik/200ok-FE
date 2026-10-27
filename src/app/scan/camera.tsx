@@ -28,7 +28,9 @@ import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { setScanPhoto } from '@/services/scanPhotoStore';
 import { describeItem, normalizeBbox, pruneObjects, ScanColors, type Box } from '@/constants/scanDesign';
 import {
+  getPendingAnalysisJobId,
   getScanObjects,
+  resumePendingAnalysis,
   ScanUploadError,
   uploadScan,
   type AnalysisStatus,
@@ -158,6 +160,48 @@ export default function ScanCameraScreen() {
     },
     [isWeb]
   );
+
+  // 분석 중 새로고침된 경우 저장해 둔 jobId로 현재 상태를 확인하고 SSE를 다시 연결한다.
+  useEffect(() => {
+    if (!isWeb || !getPendingAnalysisJobId()) return;
+
+    let cancelled = false;
+    setPhase('analyzing');
+    setUploadStatus('진행 중인 AI 분석을 다시 연결하고 있어요…');
+
+    resumePendingAnalysis((status) => {
+      if (cancelled) return;
+      if (status === 'QUEUED') setUploadStatus('AI 분석을 기다리고 있어요…');
+      if (status === 'ANALYZING' || status === 'PROCESSING') setUploadStatus('AI가 사진을 분석하고 있어요…');
+      if (status === 'COMPLETED') setUploadStatus('분석 결과를 불러오고 있어요…');
+    })
+      .then(async (result) => {
+        if (cancelled || !result) return;
+        const list = await getScanObjects(result.scanResultId);
+        if (cancelled) return;
+        const firstObject = list.objects[0];
+        if (!firstObject) throw new Error('사진에서 인식된 물건이 없어요. 다시 촬영해주세요.');
+        router.replace({
+          pathname: '/scan/captured',
+          params: { scanId: String(result.scanResultId), objectId: firstObject.objectId },
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        console.error('[SSOK AI] 진행 중인 분석 복구 실패:', error);
+        const message = error instanceof Error ? error.message : '진행 중인 분석을 다시 연결하지 못했어요.';
+        setCaptureError(message);
+        setPhase('live');
+        Alert.alert('분석 연결 실패', message);
+      })
+      .finally(() => {
+        if (!cancelled) setUploadStatus(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isWeb]);
 
   const cameraGranted = isWeb ? true : permission?.granted;
 

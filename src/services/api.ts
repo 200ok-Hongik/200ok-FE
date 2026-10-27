@@ -66,6 +66,29 @@ export class ScanUploadError extends Error {
   }
 }
 
+const PENDING_ANALYSIS_JOB_KEY = 'ssok.pendingAnalysisJobId';
+
+function savePendingAnalysisJobId(jobId: string) {
+  if (Platform.OS === 'web' && typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem(PENDING_ANALYSIS_JOB_KEY, jobId);
+  }
+}
+
+function clearPendingAnalysisJobId(jobId: string) {
+  if (
+    Platform.OS === 'web' &&
+    typeof sessionStorage !== 'undefined' &&
+    sessionStorage.getItem(PENDING_ANALYSIS_JOB_KEY) === jobId
+  ) {
+    sessionStorage.removeItem(PENDING_ANALYSIS_JOB_KEY);
+  }
+}
+
+export function getPendingAnalysisJobId(): string | null {
+  if (Platform.OS !== 'web' || typeof sessionStorage === 'undefined') return null;
+  return sessionStorage.getItem(PENDING_ANALYSIS_JOB_KEY);
+}
+
 export type ScanDetail = {
   scanId: number;
   imageUrl: string;
@@ -324,6 +347,174 @@ function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
+type AnalysisSseSignal = 'COMPLETED' | 'FAILED' | 'VERIFY' | 'TIMEOUT';
+
+function parseAnalysisStatus(value: unknown): AnalysisStatus | null {
+  const status = String(value ?? '').toUpperCase();
+  return status === 'QUEUED' || status === 'ANALYZING' || status === 'PROCESSING' ||
+    status === 'COMPLETED' || status === 'FAILED'
+    ? status
+    : null;
+}
+
+function waitForAnalysisSse(
+  jobId: string,
+  deadline: number,
+  onStatusChange?: (status: AnalysisStatus) => void
+): Promise<AnalysisSseSignal> {
+  return new Promise((resolve) => {
+    if (typeof EventSource === 'undefined') {
+      resolve('VERIFY');
+      return;
+    }
+
+    // EventSource가 Accept: text/event-stream을 자동으로 설정한다.
+    // API 도메인이 다르므로 로그인 쿠키를 함께 보내기 위해 withCredentials를 사용한다.
+    const source = new EventSource(
+      `${API_BASE_URL}/api/ai/analysis/${encodeURIComponent(jobId)}/events`,
+      { withCredentials: true }
+    );
+    let settled = false;
+    let wasHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+    const cleanup = () => {
+      source.close();
+      clearTimeout(timeoutId);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
+    const finish = (signal: AnalysisSseSignal) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(signal);
+    };
+    const readEventStatus = (event: Event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as { status?: string };
+        return parseAnalysisStatus(payload.status);
+      } catch {
+        return null;
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        wasHidden = true;
+      } else if (wasHidden) {
+        // 앱/브라우저 복귀 시 현재 상태를 GET으로 한 번 확인한다.
+        finish('VERIFY');
+      }
+    };
+
+    source.addEventListener('connected', (event) => {
+      const status = readEventStatus(event) ?? 'QUEUED';
+      onStatusChange?.(status);
+      console.info('[SSOK AI] SSE 연결:', { jobId, status });
+    });
+    source.addEventListener('completed', (event) => {
+      const status = readEventStatus(event) ?? 'COMPLETED';
+      onStatusChange?.(status);
+      finish('COMPLETED');
+    });
+    source.addEventListener('failed', (event) => {
+      const status = readEventStatus(event) ?? 'FAILED';
+      onStatusChange?.(status);
+      finish('FAILED');
+    });
+    source.onerror = () => finish('VERIFY');
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    const timeoutId = setTimeout(
+      () => finish('TIMEOUT'),
+      Math.max(0, deadline - Date.now())
+    );
+  });
+}
+
+async function getAnalysisJob(jobId: string): Promise<AnalysisJob> {
+  try {
+    return await request<AnalysisJob>(`/api/ai/analysis/${encodeURIComponent(jobId)}`);
+  } catch (error) {
+    throw new ScanUploadError(
+      errorMessage(error, 'AI 분석 상태를 확인하지 못했어요.'),
+      'STATUS_CHECK',
+      { cause: error }
+    );
+  }
+}
+
+async function waitForAnalysisCompletion(
+  jobId: string,
+  onStatusChange?: (status: AnalysisStatus) => void,
+  currentJob?: AnalysisJob
+): Promise<ScanUploadResult> {
+  if (currentJob) {
+    const initialStatus = parseAnalysisStatus(currentJob.status);
+    if (initialStatus) onStatusChange?.(initialStatus);
+    const initialResult = completedScanResult(currentJob);
+    if (initialResult) {
+      clearPendingAnalysisJobId(jobId);
+      return initialResult;
+    }
+    if (initialStatus === 'FAILED') {
+      clearPendingAnalysisJobId(jobId);
+      throw new ScanUploadError(
+        currentJob.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.',
+        'AI_ANALYSIS'
+      );
+    }
+  }
+
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline) {
+    const signal = await waitForAnalysisSse(jobId, deadline, onStatusChange);
+    if (signal === 'TIMEOUT') break;
+
+    // completed/failed 이벤트에는 결과가 없으므로, 연결 오류·앱 복귀 때와 마찬가지로
+    // 기존 조회 API를 한 번 호출해 최종 결과 또는 현재 상태를 확인한다.
+    const current = await getAnalysisJob(jobId);
+    console.info('[SSOK AI] SSE 신호 후 분석 조회 응답:', { signal, current });
+    const status = parseAnalysisStatus(current.status);
+    if (status) onStatusChange?.(status);
+
+    const result = completedScanResult(current);
+    if (result) {
+      clearPendingAnalysisJobId(jobId);
+      return result;
+    }
+    if (status === 'FAILED') {
+      clearPendingAnalysisJobId(jobId);
+      throw new ScanUploadError(
+        current.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.',
+        'AI_ANALYSIS'
+      );
+    }
+
+    // SSE 연결이 끊겼지만 작업이 아직 진행 중이면 폴링하지 않고 SSE만 다시 연결한다.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+
+  throw new ScanUploadError(
+    'AI 분석이 예상보다 오래 걸리고 있어요. 잠시 후 다시 시도해주세요.',
+    'TIMEOUT'
+  );
+}
+
+export async function resumePendingAnalysis(
+  onStatusChange?: (status: AnalysisStatus) => void
+): Promise<ScanUploadResult | null> {
+  const jobId = getPendingAnalysisJobId();
+  if (!jobId) return null;
+
+  // 새로고침 후에는 먼저 기존 GET API로 현재 상태를 한 번 확인한다.
+  const current = await getAnalysisJob(jobId);
+  return waitForAnalysisCompletion(jobId, onStatusChange, current);
+}
+
 export async function uploadScan(
   imageUri: string,
   onStatusChange?: (status: AnalysisStatus) => void
@@ -372,62 +563,8 @@ export async function uploadScan(
   if (!job?.jobId) {
     throw new ScanUploadError('백엔드가 AI 작업 ID를 반환하지 않았어요.', 'SUBMISSION');
   }
-
-  const initialStatus = job.status?.toUpperCase() as AnalysisStatus;
-  if (initialStatus) onStatusChange?.(initialStatus);
-  const initialResult = completedScanResult(job);
-  if (initialResult) return initialResult;
-  if (initialStatus === 'FAILED') {
-    throw new ScanUploadError(
-      job.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.',
-      'AI_ANALYSIS'
-    );
-  }
-
-  const deadline = Date.now() + 180000;
-  let consecutiveStatusErrors = 0;
-  while (Date.now() < deadline) {
-    let current: AnalysisJob;
-    try {
-      current = await request<AnalysisJob>(`/api/ai/analysis/${encodeURIComponent(job.jobId)}`);
-      consecutiveStatusErrors = 0;
-    } catch (error) {
-      consecutiveStatusErrors += 1;
-      console.warn('[SSOK AI] 분석 상태 조회 실패:', {
-        jobId: job.jobId,
-        attempt: consecutiveStatusErrors,
-        error,
-      });
-      if (consecutiveStatusErrors >= 3) {
-        throw new ScanUploadError(
-          errorMessage(error, 'AI 분석 상태를 확인하지 못했어요.'),
-          'STATUS_CHECK',
-          { cause: error }
-        );
-      }
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      continue;
-    }
-    console.info('[SSOK AI] 분석 조회 응답:', current);
-    const status = current.status?.toUpperCase() as AnalysisStatus;
-    if (status) onStatusChange?.(status);
-
-    const result = completedScanResult(current);
-    if (result) return result;
-    if (status === 'FAILED') {
-      throw new ScanUploadError(
-        current.errorMessage || 'AI 분석에 실패했어요. 다시 촬영해주세요.',
-        'AI_ANALYSIS'
-      );
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-  }
-
-  throw new ScanUploadError(
-    'AI 분석이 예상보다 오래 걸리고 있어요. 잠시 후 다시 시도해주세요.',
-    'TIMEOUT'
-  );
+  savePendingAnalysisJobId(job.jobId);
+  return waitForAnalysisCompletion(job.jobId, onStatusChange, job);
 }
 
 export async function checkAiServerHealth(): Promise<string> {
