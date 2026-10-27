@@ -51,15 +51,6 @@ export const DisposalGuideSteps = [
   { title: '배출하기', desc: '플라스틱 수거함에 배출해주세요.' },
 ];
 
-export const GuideCategories = [
-  { id: 'paper', label: '종이류', emoji: '📦' },
-  { id: 'can', label: '금속캔, 고철', emoji: '🥫' },
-  { id: 'glass', label: '유리병류', emoji: '🍾' },
-  { id: 'plastic', label: '플라스틱 용기류', emoji: '🧴' },
-  { id: 'vinyl', label: '비닐류', emoji: '🛍️' },
-  { id: 'styrofoam', label: '스티로폼류', emoji: '📦' },
-];
-
 export type HistoryEntry = {
   date: string;
   time: string;

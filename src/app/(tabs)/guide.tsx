@@ -6,17 +6,9 @@ import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
+import { describeItem, type ItemGroup } from '@/constants/scanDesign';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
-import { GuideCategories } from '@/constants/mockData';
-
-const CATEGORY_ART: Record<string, string> = {
-  paper: '📰',
-  glass: '🍾',
-  plastic: '🧴',
-  can: '🥫',
-  vinyl: '🛍️',
-  styrofoam: '🍱',
-};
+import { getTrashCategories, type TrashCategory } from '@/services/api';
 
 const CATEGORY_ICON_SOURCES = {
   paper: require('../../../assets/images/guide-categories/paper.svg'),
@@ -27,7 +19,9 @@ const CATEGORY_ICON_SOURCES = {
   styrofoam: require('../../../assets/images/guide-categories/styrofoam.svg'),
 };
 
-const CATEGORY_SEARCH_KEYWORDS: Record<string, string[]> = {
+// 서버 품목 이름 외에, 사람들이 흔히 찾는 단어로도 검색되게 하는 보조 검색어 (품목 묶음 기준)
+const CATEGORY_SEARCH_KEYWORDS: Record<ItemGroup, string[]> = {
+  other: [],
   paper: ['종이', '박스', '종이상자', '신문', '책', '노트', '택배상자'],
   can: ['캔', '고철', '알루미늄', '철', '음료캔', '통조림'],
   glass: ['유리', '유리병', '소주병', '맥주병', '음료병'],
@@ -64,24 +58,51 @@ export default function GuideScreen() {
   const [query, setQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const normalizedQuery = query.trim().replace(/\s/g, '').toLowerCase();
+  const [allCategories, setAllCategories] = useState<TrashCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // 가이드에 보여줄 품목 목록. "인식 불가"는 배출 가이드가 없어서 뺀다.
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    setLoadError(false);
+    getTrashCategories()
+      .then((items) => {
+        if (!cancelled) setAllCategories(items.filter((item) => item.code !== 'UNKNOWN'));
+      })
+      .catch((error) => {
+        console.warn('가이드 품목을 불러오지 못했습니다.', error);
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
   const categories = useMemo(() => {
-    if (!normalizedQuery) return GuideCategories;
-    return GuideCategories.filter((category) => {
-      const searchableWords = [category.label, ...(CATEGORY_SEARCH_KEYWORDS[category.id] ?? [])];
+    if (!normalizedQuery) return allCategories;
+    return allCategories.filter((category) => {
+      const { group } = describeItem(category.code, category.name);
+      const searchableWords = [category.name, ...CATEGORY_SEARCH_KEYWORDS[group]];
       return searchableWords.some((word) => word.replace(/\s/g, '').toLowerCase().includes(normalizedQuery));
     });
-  }, [normalizedQuery]);
+  }, [normalizedQuery, allCategories]);
   const [bannerTags, setBannerTags] = useState(['#간편함', '#편리함', '#J형인간']);
 
   useEffect(() => {
     setBannerTags(getBannerTags());
   }, []);
   const isSearchMode = isSearchFocused || normalizedQuery.length > 0;
-  const openCategory = (categoryId: string) => {
-    router.push({ pathname: '/guide-detail' as never, params: { category: categoryId } });
+  const openCategory = (categoryId: number) => {
+    router.push({ pathname: '/guide-detail' as never, params: { categoryId: String(categoryId) } });
   };
   const openFirstSearchResult = () => {
-    if (categories[0]) openCategory(categories[0].id);
+    if (categories[0]) openCategory(categories[0].categoryId);
   };
 
   return (
@@ -154,24 +175,33 @@ export default function GuideScreen() {
             </View>
           )}
           <View style={styles.categoryGrid}>
-            {categories.map((category) => (
-              <Pressable
-                key={category.id}
-                style={({ pressed }) => [styles.categoryItem, pressed && styles.pressed]}
-                onPress={() => openCategory(category.id)}>
-                <Image
-                  source={CATEGORY_ICON_SOURCES[category.id as keyof typeof CATEGORY_ICON_SOURCES]}
-                  style={styles.categoryArt}
-                  contentFit="contain"
-                  transition={0}
-                />
-                <Text style={styles.categoryLabel}>{category.label}</Text>
-              </Pressable>
-            ))}
+            {categories.map((category) => {
+              // 서버 품목(무색 페트병·종이팩 등)을 가장 가까운 기존 그림에 연결한다. 알 수 없는 품목은 플라스틱 그림을 쓴다.
+              const { group } = describeItem(category.code, category.name);
+              const art = CATEGORY_ICON_SOURCES[group === 'other' ? 'plastic' : group];
+              return (
+                <Pressable
+                  key={category.categoryId}
+                  style={({ pressed }) => [styles.categoryItem, pressed && styles.pressed]}
+                  onPress={() => openCategory(category.categoryId)}>
+                  <Image source={art} style={styles.categoryArt} contentFit="contain" transition={0} />
+                  <Text style={styles.categoryLabel}>{category.name}</Text>
+                </Pressable>
+              );
+            })}
           </View>
 
-          {categories.length === 0 && (
-            <Text style={styles.emptyText}>검색 결과가 없어요.</Text>
+          {isLoading ? (
+            <Text style={styles.emptyText}>품목을 불러오고 있어요…</Text>
+          ) : loadError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.emptyText}>품목을 불러오지 못했어요.</Text>
+              <Pressable accessibilityRole="button" onPress={() => setReloadKey((key) => key + 1)} style={styles.retryButton}>
+                <Text style={styles.retryText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          ) : (
+            categories.length === 0 && <Text style={styles.emptyText}>검색 결과가 없어요.</Text>
           )}
 
           {!isSearchMode && <View style={styles.scanBanner}>
@@ -262,6 +292,9 @@ const styles = StyleSheet.create({
   categoryArt: { width: 78, height: 58 },
   categoryLabel: { color: '#4D4D4D', fontSize: 13, lineHeight: 18, fontWeight: '500' },
   pressed: { opacity: 0.62 },
+  errorBox: { alignItems: 'center', gap: 12 },
+  retryButton: { height: 36, paddingHorizontal: 18, borderRadius: 18, borderWidth: 1, borderColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
+  retryText: { fontSize: 13, fontWeight: '700', color: Colors.primaryDark },
   emptyText: { paddingVertical: 60, textAlign: 'center', color: Colors.textTertiary, fontSize: 13 },
   scanBanner: {
     height: 152,

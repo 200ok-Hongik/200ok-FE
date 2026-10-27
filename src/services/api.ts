@@ -714,6 +714,19 @@ export async function getTrashCategories(): Promise<TrashCategory[]> {
   return request<TrashCategory[]>('/api/trash-categories');
 }
 
+// 가이드 탭: 품목별 배출 방법·주의사항·확인 항목 (GET /api/trash-categories/{categoryId}/guide)
+export type TrashCategoryGuide = {
+  category: { categoryId: number; code: string; name: string };
+  guideMessage: string;
+  cautionMessage: string;
+  checkItems: { checklistId: number; checkItemName: string; guideMessage: string; displayOrder?: number }[];
+};
+
+export async function getTrashCategoryGuide(categoryId: number): Promise<TrashCategoryGuide> {
+  const result = await request<TrashCategoryGuide>(`/api/trash-categories/${categoryId}/guide`);
+  return { ...result, checkItems: result.checkItems ?? [] };
+}
+
 export async function submitScanFeedback(scanId: number, comment: string): Promise<void> {
   await request<void>(`/api/scans/${scanId}/comments`, {
     method: 'POST',
