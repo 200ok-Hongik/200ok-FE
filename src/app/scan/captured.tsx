@@ -10,6 +10,7 @@ import { ScanSheet } from '@/components/scan/ScanSheet';
 import { ScanTabBar, useScanTabBarHeight } from '@/components/scan/ScanTabBar';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { Text } from '@/components/ui/Text';
+import { GENERAL_WASTE_NAME, isGeneralWasteCode } from '@/constants/generalWaste';
 import { cardShadow, describeItem, ScanColors, statusBarInset } from '@/constants/scanDesign';
 import {
   confirmScanObjectResult,
@@ -164,7 +165,9 @@ export default function ScanCapturedScreen() {
 
   const kindOptions = useMemo(() => {
     if (categories.length === 0) return FALLBACK_KINDS;
-    return Array.from(new Set(categories.map((category) => describeItem(category.code, category.name).kind)));
+    const kinds = Array.from(new Set(categories.map((category) => describeItem(category.code, category.name).kind)));
+    // 일반쓰레기는 목록 맨 아래에 둔다.
+    return [...kinds.filter((kind) => kind !== GENERAL_WASTE_NAME), ...kinds.filter((kind) => kind === GENERAL_WASTE_NAME)];
   }, [categories]);
 
   const materialOptions = useMemo(
@@ -200,7 +203,17 @@ export default function ScanCapturedScreen() {
         states,
       });
       console.info('[SSOK AI] 분석 결과 수정 및 확정 응답:', confirmedResult);
-      router.push({ pathname: '/scan/result', params: { scanId: String(scan.scanId), objectId } });
+      const confirmedCategoryId = selectedCategory?.categoryId ?? scan.category.categoryId;
+      const isGeneral = isGeneralWasteCode(selectedCategory?.code ?? scan.category.code);
+      router.push({
+        pathname: '/scan/result',
+        params: {
+          scanId: String(scan.scanId),
+          objectId,
+          // 일반쓰레기는 서버가 가이드를 주지 않을 수 있어서, 결과 화면이 대신 안내할 수 있게 확정 정보를 함께 넘긴다.
+          ...(isGeneral ? { general: '1', decisionId: String(confirmedResult?.decisionId ?? ''), categoryId: String(confirmedCategoryId) } : {}),
+        },
+      });
     } catch (reason) {
       console.error(reason);
       setError('결과를 확정하지 못했어요. 다시 시도해주세요.');

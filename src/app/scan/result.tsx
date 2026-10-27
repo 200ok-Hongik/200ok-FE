@@ -11,6 +11,7 @@ import { ScanSheet } from '@/components/scan/ScanSheet';
 import { SectionTitle, WarningIcon } from '@/components/scan/SectionTitle';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { Text } from '@/components/ui/Text';
+import { buildGeneralWasteGuide, isGeneralWasteCode } from '@/constants/generalWaste';
 import { cardShadow, describeItem, ScanColors, statusBarInset } from '@/constants/scanDesign';
 import {
   createCalendar,
@@ -53,7 +54,13 @@ function chipFor(item: CheckItem) {
 }
 
 export default function ScanResultScreen() {
-  const { scanId, objectId } = useLocalSearchParams<{ scanId?: string; objectId?: string }>();
+  const { scanId, objectId, general, decisionId, categoryId } = useLocalSearchParams<{
+    scanId?: string;
+    objectId?: string;
+    general?: string;
+    decisionId?: string;
+    categoryId?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const [guide, setGuide] = useState<DisposalGuide | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -85,7 +92,14 @@ export default function ScanResultScreen() {
       })
       .catch((err) => {
         console.error(err);
-        if (!cancelled) setError('배출 방법을 불러오지 못했어요.');
+        if (cancelled) return;
+        // 일반쓰레기(인식 불가)는 서버가 가이드를 주지 않을 수 있어서 앱의 기본 안내로 대신한다.
+        const knownDecisionId = Number(decisionId);
+        if (general === '1' && Number.isFinite(knownDecisionId) && knownDecisionId > 0) {
+          setGuide(buildGeneralWasteGuide(Number(scanId), knownDecisionId, Number(categoryId) || 0));
+          return;
+        }
+        setError('배출 방법을 불러오지 못했어요.');
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -120,7 +134,7 @@ export default function ScanResultScreen() {
     return () => {
       cancelled = true;
     };
-  }, [scanId, objectId]);
+  }, [scanId, objectId, general, decisionId, categoryId]);
 
   // 신뢰도가 어디서 오는지 확인할 수 있게 후보 값을 모두 남긴다.
   useEffect(() => {
@@ -141,8 +155,14 @@ export default function ScanResultScreen() {
       setSaveError(null);
       // 저장은 됐는데 이동만 실패한 경우 같은 기록이 두 번 쌓이지 않도록 한 번만 보낸다.
       if (!isSaved) {
-        const saved = await createCalendar(guide.decisionId);
-        console.info('[SSOK] 배출 기록 저장:', saved);
+        try {
+          const saved = await createCalendar(guide.decisionId);
+          console.info('[SSOK] 배출 기록 저장:', saved);
+        } catch (calendarError) {
+          // 일반쓰레기는 서버에 배출 일정이 없을 수 있다. 스캔 기록은 이미 남아 있으니 일정 저장 실패로 막지 않는다.
+          if (!isGeneralWasteCode(guide.category.code)) throw calendarError;
+          console.warn('[SSOK] 일반쓰레기 배출 일정은 저장하지 못했어요:', calendarError);
+        }
         setIsSaved(true);
       }
       router.replace({ pathname: '/(tabs)', params: { feedback: '1', scanId: scanId ?? '' } });

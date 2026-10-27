@@ -59,6 +59,8 @@ export type ItemInfo = {
 
 // 백엔드 itemCode / 카테고리 code를 디자인에 나오는 표기로 바꾼다. 순서가 중요하다. (PAPER_PACK이 PAPER보다 먼저)
 const ITEM_RULES: { test: RegExp; info: Omit<ItemInfo, 'eyebrow'> & { eyebrow?: string } }[] = [
+  // 인식하지 못한 물건(UNKNOWN)은 일반쓰레기로 보여준다. 사용자는 종류를 직접 바꿀 수 있다.
+  { test: /UNKNOWN|인식\s?불가/, info: { group: 'other', eyebrow: 'general', title: '일반쓰레기', detail: '일반쓰레기', material: '일반쓰레기', kind: '일반쓰레기' } },
   { test: /PET/, info: { group: 'plastic', title: '플라스틱', detail: '페트병 (PET)', material: 'PET', kind: '플라스틱 용기' } },
   { test: /GLASS|유리/, info: { group: 'glass', title: '유리병', detail: '유리 (GLASS)', material: '유리', kind: '유리병' } },
   { test: /CAN|캔/, info: { group: 'can', title: '캔류', detail: '캔 (CAN)', material: '캔', kind: '캔류' } },
@@ -78,6 +80,11 @@ export function describeItem(code?: string | null, name?: string | null): ItemIn
   }
   const fallback = name || code || '물건';
   return { group: 'other', eyebrow: (code || 'item').toLowerCase(), title: fallback, detail: fallback, material: fallback, kind: fallback };
+}
+
+// 서버가 내려주는 품목 이름을 화면용 이름으로 바꾼다. (UNKNOWN → 일반쓰레기, 나머지는 서버 이름 그대로)
+export function categoryDisplayName(code?: string | null, name?: string | null) {
+  return /UNKNOWN|인식\s?불가/.test(`${code ?? ''} ${name ?? ''}`.toUpperCase()) ? '일반쓰레기' : name || code || '물건';
 }
 
 export type Box = { x: number; y: number; width: number; height: number };

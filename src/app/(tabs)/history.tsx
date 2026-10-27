@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors } from '@/constants/theme';
+import { categoryDisplayName } from '@/constants/scanDesign';
 import { getScanHistory } from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -186,7 +187,7 @@ export default function HistoryScreen() {
             const time = `${String(scanned.getHours()).padStart(2, '0')}:${String(scanned.getMinutes()).padStart(2, '0')}`;
             // 한 번 찍은 사진에 물건이 여러 개면 물건마다 기록 한 줄로 보여준다.
             return scan.items.map((item): HistoryViewEntry => {
-              const name = item.category?.name || '알 수 없는 품목';
+              const name = categoryDisplayName(item.category?.code, item.category?.name) || '일반쓰레기';
               return {
                 id: `${scan.scanResultId}-${item.objectId}`,
                 date,

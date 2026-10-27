@@ -524,7 +524,7 @@ function ObjectCard({
       <View style={styles.cardCopy}>
         <Text style={styles.cardEyebrow} numberOfLines={1}>{info.eyebrow}</Text>
         <Text style={styles.cardTitle} numberOfLines={1}>{info.title}</Text>
-        <Text style={styles.cardDetail} numberOfLines={1}>{info.detail}</Text>
+        {info.detail !== info.title && <Text style={styles.cardDetail} numberOfLines={1}>{info.detail}</Text>}
       </View>
       <View style={styles.cardArrow}>
         <PathIcon icon={ICONS.cardChevron} color="#FBFAF8" />
