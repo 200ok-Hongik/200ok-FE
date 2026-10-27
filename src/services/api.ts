@@ -1,4 +1,6 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
+
+import { openSseStream } from '@/services/sse';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'https://dev.ssok.store';
 export const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL ?? 'https://ssok.store';
@@ -363,26 +365,16 @@ function waitForAnalysisSse(
   onStatusChange?: (status: AnalysisStatus) => void
 ): Promise<AnalysisSseSignal> {
   return new Promise((resolve) => {
-    if (typeof EventSource === 'undefined') {
-      resolve('VERIFY');
-      return;
-    }
-
-    // EventSource가 Accept: text/event-stream을 자동으로 설정한다.
-    // API 도메인이 다르므로 로그인 쿠키를 함께 보내기 위해 withCredentials를 사용한다.
-    const source = new EventSource(
-      `${API_BASE_URL}/api/ai/analysis/${encodeURIComponent(jobId)}/events`,
-      { withCredentials: true }
-    );
+    const url = `${API_BASE_URL}/api/ai/analysis/${encodeURIComponent(jobId)}/events`;
     let settled = false;
-    let wasHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+    let wasInBackground = AppState.currentState !== 'active';
+    let closeStream: () => void = () => undefined;
+    let removeLifecycleListener: () => void = () => undefined;
 
     const cleanup = () => {
-      source.close();
+      closeStream();
       clearTimeout(timeoutId);
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
+      removeLifecycleListener();
     };
     const finish = (signal: AnalysisSseSignal) => {
       if (settled) return;
@@ -390,48 +382,68 @@ function waitForAnalysisSse(
       cleanup();
       resolve(signal);
     };
-    const readEventStatus = (event: Event) => {
+    const readStatus = (data: string | undefined) => {
       try {
-        const payload = JSON.parse((event as MessageEvent<string>).data) as { status?: string };
+        const payload = JSON.parse(data ?? '') as { status?: string };
         return parseAnalysisStatus(payload.status);
       } catch {
         return null;
       }
     };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        wasHidden = true;
-      } else if (wasHidden) {
-        // 앱/브라우저 복귀 시 현재 상태를 GET으로 한 번 확인한다.
-        finish('VERIFY');
+    const handleEvent = (name: string, data: string | undefined) => {
+      if (name === 'connected') {
+        const status = readStatus(data) ?? 'QUEUED';
+        onStatusChange?.(status);
+        console.info('[SSOK AI] SSE 연결:', { jobId, status });
+      } else if (name === 'completed') {
+        onStatusChange?.(readStatus(data) ?? 'COMPLETED');
+        finish('COMPLETED');
+      } else if (name === 'failed') {
+        onStatusChange?.(readStatus(data) ?? 'FAILED');
+        finish('FAILED');
       }
     };
 
-    source.addEventListener('connected', (event) => {
-      const status = readEventStatus(event) ?? 'QUEUED';
-      onStatusChange?.(status);
-      console.info('[SSOK AI] SSE 연결:', { jobId, status });
-    });
-    source.addEventListener('completed', (event) => {
-      const status = readEventStatus(event) ?? 'COMPLETED';
-      onStatusChange?.(status);
-      finish('COMPLETED');
-    });
-    source.addEventListener('failed', (event) => {
-      const status = readEventStatus(event) ?? 'FAILED';
-      onStatusChange?.(status);
-      finish('FAILED');
-    });
-    source.onerror = () => finish('VERIFY');
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
+    if (typeof EventSource !== 'undefined') {
+      // 웹: 브라우저 EventSource가 Accept: text/event-stream을 자동으로 설정한다.
+      // API 도메인이 다르므로 로그인 쿠키를 함께 보내기 위해 withCredentials를 사용한다.
+      const source = new EventSource(url, { withCredentials: true });
+      closeStream = () => source.close();
+      for (const name of ['connected', 'completed', 'failed']) {
+        source.addEventListener(name, (event) => handleEvent(name, (event as MessageEvent<string>).data));
+      }
+      source.onerror = () => finish('VERIFY');
+    } else {
+      // iOS/Android: EventSource가 없으므로 스트리밍 fetch로 같은 이벤트를 읽는다.
+      closeStream = openSseStream(url, {
+        onMessage: (message) => handleEvent(message.event, message.data),
+        onError: (error) => {
+          console.warn('[SSOK AI] SSE 스트림 오류:', error);
+          finish('VERIFY');
+        },
+      });
     }
 
-    const timeoutId = setTimeout(
-      () => finish('TIMEOUT'),
-      Math.max(0, deadline - Date.now())
-    );
+    // 앱/브라우저가 백그라운드에 갔다가 돌아오면 연결이 끊겼을 수 있으니 현재 상태를 GET으로 한 번 확인한다.
+    if (Platform.OS === 'web') {
+      if (typeof document !== 'undefined') {
+        const handleVisibilityChange = () => {
+          if (document.visibilityState === 'hidden') wasInBackground = true;
+          else if (wasInBackground) finish('VERIFY');
+        };
+        wasInBackground = document.visibilityState === 'hidden';
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        removeLifecycleListener = () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    } else {
+      const subscription = AppState.addEventListener('change', (state) => {
+        if (state !== 'active') wasInBackground = true;
+        else if (wasInBackground) finish('VERIFY');
+      });
+      removeLifecycleListener = () => subscription.remove();
+    }
+
+    const timeoutId = setTimeout(() => finish('TIMEOUT'), Math.max(0, deadline - Date.now()));
   });
 }
 
