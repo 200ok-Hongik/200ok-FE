@@ -133,7 +133,7 @@ export default function ScanReviewScreen() {
 
   // 모든 물건을 확정하고 물건별 배출 안내를 받아 "같은 품목 + 같은 상태"끼리 묶는다.
   const handleConfirm = async () => {
-    if (!items || isConfirming || pending.length > 0) return;
+    if (!items || isConfirming) return;
     try {
       setIsConfirming(true);
       setActionError(null);
@@ -273,7 +273,7 @@ export default function ScanReviewScreen() {
                     <Text style={styles.sheetTitle}>{`물건 ${items.length}개를 찾았어요`}</Text>
                     <Text style={styles.sheetSub}>
                       {pending.length > 0
-                        ? `${pending.length}개만 확인해 주세요. 나머지는 그대로 넘어가도 돼요.`
+                        ? `${pending.length}개는 인식이 확실하지 않아요. 틀렸다면 연필을 눌러 고쳐 주세요.`
                         : '다르게 인식된 물건이 있으면 연필을 눌러 고쳐 주세요.'}
                     </Text>
                   </View>
@@ -313,16 +313,10 @@ export default function ScanReviewScreen() {
                 {!!actionError && <Text style={styles.actionError}>{actionError}</Text>}
                 <Pressable
                   accessibilityRole="button"
-                  disabled={pending.length > 0 || isConfirming}
+                  disabled={isConfirming}
                   onPress={handleConfirm}
-                  style={({ pressed }) => [styles.cta, pending.length > 0 && styles.ctaDisabled, pressed && { opacity: 0.85 }]}>
-                  {isConfirming ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={[styles.ctaText, pending.length > 0 && styles.ctaTextDisabled]}>
-                      {pending.length > 0 ? `${pending.length}개 확인하면 결과를 볼 수 있어요` : '배출 방법 확인하기'}
-                    </Text>
-                  )}
+                  style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}>
+                  {isConfirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.ctaText}>배출 방법 확인하기</Text>}
                 </Pressable>
               </View>
 
@@ -355,7 +349,7 @@ function ItemRow({
   const general = isGeneralWasteCode(item.detail.category.code) && item.categoryId === item.detail.category.categoryId;
   const hint = pending
     ? general
-      ? '확실하지 않아 일반쓰레기로 보여드려요. 연필을 눌러 직접 골라 주세요.'
+      ? '확실하지 않아 일반쓰레기로 보여드려요. 틀렸다면 연필을 눌러 고쳐 주세요.'
       : '인식이 확실하지 않아요. 맞는지 확인해 주세요.'
     : itemStateText(item);
 
@@ -431,8 +425,6 @@ const styles = StyleSheet.create({
   ctaWrap: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingTop: 8 },
   ctaFade: { position: 'absolute', left: 0, right: 0, bottom: 0, top: -24 },
   cta: { height: 52, borderRadius: 12, backgroundColor: ScanColors.green, alignItems: 'center', justifyContent: 'center' },
-  ctaDisabled: { backgroundColor: '#E9E9E8' },
   ctaText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
-  ctaTextDisabled: { color: '#8A8A89' },
   actionError: { marginBottom: 8, textAlign: 'center', fontSize: 13, color: '#B42318' },
 });
