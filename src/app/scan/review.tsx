@@ -14,7 +14,7 @@ import { SsokLogo } from '@/components/ui/SsokLogo';
 import { Text } from '@/components/ui/Text';
 import { buildGeneralWasteGuide, isGeneralWasteCode } from '@/constants/generalWaste';
 import { categoryDisplayName, pruneObjects, ScanColors, statusBarInset } from '@/constants/scanDesign';
-import { groupResults, itemStateText, LOW_CONFIDENCE, toRatio, type ReviewGroup, type ReviewItem } from '@/constants/scanReview';
+import { groupResults, type ReviewGroup, type ReviewItem } from '@/constants/scanReview';
 import {
   confirmScanObjectResult,
   createCalendar,
@@ -84,7 +84,6 @@ export default function ScanReviewScreen() {
         setItems(
           objects.map((object, index) => {
             const detail = details[index];
-            const ratio = toRatio(detail.category.confidence);
             return {
               objectId: object.objectId,
               number: index + 1,
@@ -92,8 +91,6 @@ export default function ScanReviewScreen() {
               detail,
               categoryId: detail.category.categoryId,
               values: Object.fromEntries(detail.states.map((state) => [state.checklistId, String(state.statusValue)])),
-              suspicious: isGeneralWasteCode(detail.category.code) || (ratio != null && ratio < LOW_CONFIDENCE),
-              checked: false,
             };
           })
         );
@@ -114,9 +111,8 @@ export default function ScanReviewScreen() {
     return categoryDisplayName(category.code, category.name);
   };
 
-  const pending = useMemo(() => (items ?? []).filter((item) => item.suspicious && !item.checked), [items]);
   const boxItems = useMemo<BoxItem[]>(
-    () => (items ?? []).map((item) => ({ id: item.objectId, number: item.number, bbox: item.bbox, tone: item.suspicious && !item.checked ? 'warn' : 'ok' })),
+    () => (items ?? []).map((item) => ({ id: item.objectId, number: item.number, bbox: item.bbox })),
     [items]
   );
   const editing = items?.find((item) => item.objectId === editingId) ?? null;
@@ -125,7 +121,7 @@ export default function ScanReviewScreen() {
     if (!editing) return;
     setItems((current) =>
       (current ?? []).map((item) =>
-        item.objectId === editing.objectId ? { ...item, categoryId: draft.categoryId, values: draft.values, checked: true } : item
+        item.objectId === editing.objectId ? { ...item, categoryId: draft.categoryId, values: draft.values } : item
       )
     );
     setEditingId(null);
@@ -271,11 +267,7 @@ export default function ScanReviewScreen() {
                 header={
                   <View style={styles.sheetHead}>
                     <Text style={styles.sheetTitle}>{`물건 ${items.length}개를 찾았어요`}</Text>
-                    <Text style={styles.sheetSub}>
-                      {pending.length > 0
-                        ? `${pending.length}개는 인식이 확실하지 않아요. 틀렸다면 연필을 눌러 고쳐 주세요.`
-                        : '다르게 인식된 물건이 있으면 연필을 눌러 고쳐 주세요.'}
-                    </Text>
+                    <Text style={styles.sheetSub}>다르게 인식된 물건이 있으면 연필을 눌러 고쳐 주세요.</Text>
                   </View>
                 }>
                 {expanded && (
@@ -298,7 +290,6 @@ export default function ScanReviewScreen() {
                     item={item}
                     name={nameOf(item)}
                     selected={item.objectId === selectedId}
-                    pending={item.suspicious && !item.checked}
                     onSelect={() => setSelectedId(item.objectId)}
                     onEdit={() => {
                       setSelectedId(item.objectId);
@@ -335,42 +326,23 @@ function ItemRow({
   item,
   name,
   selected,
-  pending,
   onSelect,
   onEdit,
 }: {
   item: ReviewItem;
   name: string;
   selected: boolean;
-  pending: boolean;
   onSelect: () => void;
   onEdit: () => void;
 }) {
-  const general = isGeneralWasteCode(item.detail.category.code) && item.categoryId === item.detail.category.categoryId;
-  const hint = pending
-    ? general
-      ? '확실하지 않아 일반쓰레기로 보여드려요. 틀렸다면 연필을 눌러 고쳐 주세요.'
-      : '인식이 확실하지 않아요. 맞는지 확인해 주세요.'
-    : itemStateText(item);
-
   // 웹에서 버튼 안에 버튼이 들어가지 않도록, 눌러서 선택하는 영역과 연필 버튼을 나란히 둔다.
   return (
-    <View style={[styles.row, pending && styles.rowPending, selected && !pending && styles.rowSelected]}>
+    <View style={[styles.row, selected && styles.rowSelected]}>
       <Pressable accessibilityRole="button" onPress={onSelect} style={styles.rowMain}>
-        <View style={[styles.rowNumber, { backgroundColor: pending ? '#F5A524' : ScanColors.green }]}>
+        <View style={styles.rowNumber}>
           <Text style={styles.rowNumberText}>{item.number}</Text>
         </View>
-        <View style={styles.rowCopy}>
-          <View style={styles.rowTitleLine}>
-            <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
-            {pending && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>확인 필요</Text>
-              </View>
-            )}
-          </View>
-          {!!hint && <Text style={styles.rowHint} numberOfLines={2}>{hint}</Text>}
-        </View>
+        <Text style={styles.rowTitle} numberOfLines={1}>{name}</Text>
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={`${item.number}번 물건 수정`} hitSlop={10} onPress={onEdit} style={styles.pencil}>
         <Text style={styles.pencilText}>✎</Text>
@@ -408,17 +380,11 @@ const styles = StyleSheet.create({
     borderColor: ScanColors.line,
     backgroundColor: '#FFFFFF',
   },
-  rowPending: { borderColor: '#F5A524', backgroundColor: '#FFF8EC' },
   rowSelected: { borderColor: ScanColors.green, backgroundColor: ScanColors.mint },
   rowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rowNumber: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  rowNumber: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: ScanColors.green },
   rowNumberText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  rowCopy: { flex: 1 },
-  rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowTitle: { flexShrink: 1, fontSize: 16, lineHeight: 22, fontWeight: '700', color: ScanColors.ink },
-  tag: { paddingHorizontal: 8, height: 20, borderRadius: 10, backgroundColor: '#FFE2B3', alignItems: 'center', justifyContent: 'center' },
-  tagText: { fontSize: 11, fontWeight: '700', color: '#8A5300' },
-  rowHint: { marginTop: 3, fontSize: 13, lineHeight: 18, color: ScanColors.gray },
+  rowTitle: { flex: 1, fontSize: 16, lineHeight: 22, fontWeight: '700', color: ScanColors.ink },
   pencil: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: ScanColors.chipGray },
   pencilText: { fontSize: 17, color: ScanColors.ink2 },
 

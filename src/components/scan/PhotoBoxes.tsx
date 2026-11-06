@@ -9,8 +9,6 @@ export type BoxItem = {
   id: string;
   number: number;
   bbox: ScanObjectSummary['bbox'];
-  // warn: 확인이 필요한 물건, ok: 그대로 넘어가도 되는 물건
-  tone: 'warn' | 'ok';
 };
 
 type Props = {
@@ -24,7 +22,7 @@ type Props = {
   radius?: number;
 };
 
-const TONE_COLORS = { warn: '#F5A524', ok: '#26B36D' } as const;
+const BOX_COLOR = '#26B36D';
 
 // 사진을 영역 안에 맞춰(contain) 보여주고, 인식된 물건마다 윤곽선과 번호를 얹는다.
 export function PhotoBoxes({ uri, naturalSize, items, width, height, selectedId, onSelect, radius = 0 }: Props) {
@@ -75,7 +73,7 @@ export function PhotoBoxes({ uri, naturalSize, items, width, height, selectedId,
         />
       ) : null}
       {boxes.map(({ item, box }) => {
-        const color = TONE_COLORS[item.tone];
+        const color = BOX_COLOR;
         const selected = item.id === selectedId;
         return (
           <Pressable

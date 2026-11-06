@@ -30,6 +30,16 @@ export function ItemEditSheet({ item, categories, onClose, onSave }: Props) {
     return [...list.filter((c) => !isGeneralWasteCode(c.code)), ...list.filter((c) => isGeneralWasteCode(c.code))];
   }, [categories, item.detail.category]);
 
+  // 화면에 보여줄 이름이 있는 상태만 고치게 한다. 나머지 항목의 값은 그대로 서버에 보낸다.
+  const editableStates = useMemo(
+    () =>
+      item.detail.states.flatMap((state) => {
+        const meta = stateMeta(state.checkItemName);
+        return meta ? [{ state, meta }] : [];
+      }),
+    [item.detail.states]
+  );
+
   const changed =
     draft.categoryId !== item.categoryId ||
     item.detail.states.some((state) => draft.values[state.checklistId] !== item.values[state.checklistId]);
@@ -61,12 +71,11 @@ export function ItemEditSheet({ item, categories, onClose, onSave }: Props) {
         })}
       </View>
 
-      {item.detail.states.length > 0 && (
+      {editableStates.length > 0 && (
         <>
           <Text style={[styles.sectionLabel, { marginTop: 24 }]}>상태</Text>
           <View style={styles.stateList}>
-            {item.detail.states.map((state, index) => {
-              const meta = stateMeta(state.checkItemName);
+            {editableStates.map(({ state, meta }, index) => {
               const on = isStateOn(draft.values[state.checklistId] ?? state.statusValue);
               const set = (value: boolean) =>
                 setDraft({ ...draft, values: { ...draft.values, [state.checklistId]: String(value) } });

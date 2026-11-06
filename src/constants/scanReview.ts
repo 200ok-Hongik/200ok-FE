@@ -1,9 +1,6 @@
 import { describeState, isStateOn } from '@/constants/scanStates';
 import type { DisposalGuide, ScanDetail, ScanObjectSummary } from '@/services/api';
 
-// 이 값보다 신뢰도가 낮으면 "확인 필요"로 표시한다. (일반쓰레기로 인식된 물건은 신뢰도와 상관없이 확인 필요)
-export const LOW_CONFIDENCE = 0.6;
-
 export type ReviewItem = {
   objectId: string;
   // 사진 속 번호 (1부터)
@@ -13,21 +10,12 @@ export type ReviewItem = {
   categoryId: number;
   // checklistId → 사용자가 고른 상태값("true"/"false")
   values: Record<number, string>;
-  // 처음부터 확인이 필요했던 물건인지
-  suspicious: boolean;
-  // 사용자가 수정 시트에서 확인을 마쳤는지
-  checked: boolean;
 };
-
-// 서버가 0~100(퍼센트)으로 줄 수도 있어서 1보다 크면 100으로 나눈다. 0/없음은 null.
-export function toRatio(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value) || value <= 0) return null;
-  return Math.min(1, value > 1 ? value / 100 : value);
-}
 
 export function itemStateText(item: Pick<ReviewItem, 'detail' | 'values'>) {
   return item.detail.states
     .map((state) => describeState(state.checkItemName, item.values[state.checklistId] ?? state.statusValue))
+    .filter((text): text is string => text != null)
     .join(' · ');
 }
 
