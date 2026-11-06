@@ -35,6 +35,7 @@ export default function RootLayout() {
       <Stack.Screen name="oauth/callback" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="scan/camera" options={{ animation: 'fade' }} />
+      <Stack.Screen name="scan/review" />
       <Stack.Screen name="scan/captured" />
       <Stack.Screen name="scan/result" />
     </Stack>

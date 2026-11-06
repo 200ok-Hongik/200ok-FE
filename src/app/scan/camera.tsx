@@ -1,32 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, type LayoutChangeEvent, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ObjectThumb } from '@/components/scan/ObjectThumb';
-import { PathIcon } from '@/components/scan/PathIcon';
 import { ScanTabBar, useScanTabBarHeight } from '@/components/scan/ScanTabBar';
 import { Viewfinder } from '@/components/scan/Viewfinder';
-import { ICONS } from '@/components/scan/iconPaths';
 import { Text } from '@/components/ui/Text';
 import { WebCameraView, type WebCameraHandle } from '@/components/WebCameraView';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { setScanPhoto } from '@/services/scanPhotoStore';
-import { describeItem, normalizeBbox, pruneObjects, ScanColors, type Box } from '@/constants/scanDesign';
+import type { Box } from '@/constants/scanDesign';
 import {
   getPendingAnalysisJobId,
   getScanObjects,
@@ -34,25 +19,15 @@ import {
   ScanUploadError,
   uploadScan,
   type AnalysisStatus,
-  type ScanObjectSummary,
 } from '@/services/api';
 
 type Phase = 'live' | 'analyzing' | 'recognized';
 
 // 디자인 치수 (375x812 기준)
-const CARD_WIDTH = 284;
-const CARD_GAP = 25;
-const CARD_SNAP = CARD_WIDTH + CARD_GAP;
-const CARD_LEFT = 42;
 const VIEWFINDER_WIDTH = 252;
 const VIEWFINDER_HEIGHT = 352;
-const BOX_PAD_X = 44;
-const BOX_PAD_Y = 28;
 const SHUTTER_SIZE = 64;
-const MIN_BOX_WIDTH = 120;
 const MIN_BOX_HEIGHT = 150;
-
-type CapturedPhoto = { uri: string; width?: number; height?: number };
 
 function captureWithSystemCamera(): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -98,29 +73,6 @@ function captureWithSystemCamera(): Promise<string> {
   });
 }
 
-// 사진(원본) 좌표계의 비율 박스를 화면(cover 맞춤) 좌표로 옮긴다.
-function toScreenBox(box: Box, photo: { width: number; height: number }, screen: { width: number; height: number }): Box {
-  const scale = Math.max(screen.width / photo.width, screen.height / photo.height);
-  const offsetX = (photo.width * scale - screen.width) / 2;
-  const offsetY = (photo.height * scale - screen.height) / 2;
-  return {
-    x: box.x * photo.width * scale - offsetX,
-    y: box.y * photo.height * scale - offsetY,
-    width: box.width * photo.width * scale,
-    height: box.height * photo.height * scale,
-  };
-}
-
-// 너무 작거나 화면 밖으로 나간 박스도 모서리가 읽히도록 보정한다.
-function fitBox(box: Box, screen: { width: number; height: number }): Box {
-  // 디자인의 뷰파인더는 물건보다 한 뼘 크게 잡힌다.
-  const width = Math.min(Math.max(box.width + BOX_PAD_X * 2, MIN_BOX_WIDTH), screen.width - 8);
-  const height = Math.min(Math.max(box.height + BOX_PAD_Y * 2, MIN_BOX_HEIGHT), screen.height - 8);
-  const x = Math.min(Math.max(box.x + box.width / 2 - width / 2, 4), screen.width - width - 4);
-  const y = Math.min(Math.max(box.y + box.height / 2 - height / 2, 4), screen.height - height - 4);
-  return { x, y, width, height };
-}
-
 export default function ScanCameraScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useScanTabBarHeight();
@@ -131,11 +83,6 @@ export default function ScanCameraScreen() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [screen, setScreen] = useState({ width: 375, height: 812 });
-  const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
-  const [scanId, setScanId] = useState<number | null>(null);
-  const [objects, setObjects] = useState<ScanObjectSummary[]>([]);
-  const [selected, setSelected] = useState(0);
-  const [previewMirrored, setPreviewMirrored] = useState(false);
   const requestedRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
   const webCameraRef = useRef<WebCameraHandle>(null);
@@ -179,12 +126,8 @@ export default function ScanCameraScreen() {
         if (cancelled || !result) return;
         const list = await getScanObjects(result.scanResultId);
         if (cancelled) return;
-        const firstObject = list.objects[0];
-        if (!firstObject) throw new Error('사진에서 인식된 물건이 없어요. 다시 촬영해주세요.');
-        router.replace({
-          pathname: '/scan/captured',
-          params: { scanId: String(result.scanResultId), objectId: firstObject.objectId },
-        });
+        if (list.objects.length === 0) throw new Error('사진에서 인식된 물건이 없어요. 다시 촬영해주세요.');
+        router.replace({ pathname: '/scan/review', params: { scanId: String(result.scanResultId) } });
       })
       .catch((error) => {
         if (cancelled) return;
@@ -255,14 +198,19 @@ export default function ScanCameraScreen() {
   const resetToLive = useCallback(async () => {
     if (isWeb && photoUriRef.current) URL.revokeObjectURL(photoUriRef.current);
     photoUriRef.current = null;
-    setPhoto(null);
-    setObjects([]);
-    setScanId(null);
-    setSelected(0);
     setPhase('live');
     await resumePreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWeb]);
+
+  // 결과 확인 화면에서 돌아오면(뒤로 가기) 바로 다시 촬영할 수 있게 카메라를 되돌린다.
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  useFocusEffect(
+    useCallback(() => {
+      if (phaseRef.current === 'recognized') resetToLive();
+    }, [resetToLive])
+  );
 
   const handleCapture = async () => {
     if (phase === 'recognized') {
@@ -320,16 +268,10 @@ export default function ScanCameraScreen() {
 
       keepPhoto = true;
       photoUriRef.current = isWeb ? taken.uri : null;
-      setPhoto({ uri: taken.uri, width: taken.width, height: taken.height });
       setScanPhoto(resultScanId, { uri: taken.uri, width: taken.width, height: taken.height });
-      setScanId(resultScanId);
-      const shown = pruneObjects(list.objects, taken.width ?? 0, taken.height ?? 0);
-      if (shown.length !== list.objects.length) {
-        console.info('[SSOK AI] 겹치거나 작은 조각 물건을 제외했어요:', list.objects.length, '→', shown.length);
-      }
-      setObjects(shown);
-      setSelected(0);
       setPhase('recognized');
+      // 물건별 윤곽선과 목록은 확인 화면에서 한 번에 보여준다. (겹치는 조각 정리도 그 화면에서 한다)
+      router.push({ pathname: '/scan/review', params: { scanId: String(resultScanId) } });
     } catch (error) {
       console.error(error);
       await resumePreview();
@@ -363,27 +305,15 @@ export default function ScanCameraScreen() {
     }
   };
 
-  const openObject = (object: ScanObjectSummary) => {
-    if (scanId == null) return;
-    router.push({ pathname: '/scan/captured', params: { scanId: String(scanId), objectId: object.objectId } });
-  };
-
-  const handleCardScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(event.nativeEvent.contentOffset.x / CARD_SNAP);
-    setSelected(Math.min(Math.max(index, 0), objects.length - 1));
-  };
-
   const handleLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setScreen((current) => (current.width === width && current.height === height ? current : { width, height }));
   };
 
-  // 디자인 기준 위치: 카드 상단 y=64(상태바 아래 20), 기본 뷰파인더 상단 y=229
-  const cardsTop = Math.max(insets.top, 44) + 20;
+  // 디자인 기준 위치: 상태바 아래 20에서 80 더 내려온 y=229 근처에 기본 뷰파인더가 놓인다.
+  const finderTop = Math.max(insets.top, 44) + 100;
   // 뷰파인더는 화면 위쪽부터 셔터 버튼 위까지의 공간 안에서만 잡는다. (화면이 낮으면 그만큼 줄어든다)
   const shutterTop = screen.height - (tabBarHeight + 14 + SHUTTER_SIZE);
-  // 카드는 인식이 끝난 뒤에만 나오므로, 촬영 전·분석 중 뷰파인더는 카드 자리까지 올려서 잡는다.
-  const finderTop = cardsTop + 80;
   const finderHeight = Math.max(MIN_BOX_HEIGHT, Math.min(VIEWFINDER_HEIGHT, shutterTop - 16 - finderTop));
   const finderWidth = Math.min(VIEWFINDER_WIDTH, screen.width - 48);
   const defaultBox: Box = {
@@ -393,26 +323,13 @@ export default function ScanCameraScreen() {
     height: finderHeight,
   };
 
-  let viewfinderBox = defaultBox;
-  if (phase === 'recognized' && photo) {
-    const current = objects[selected];
-    const photoSize = photo.width && photo.height ? { width: photo.width, height: photo.height } : screen;
-    const normalized = current ? normalizeBbox(current.bbox, photoSize.width, photoSize.height) : null;
-    if (normalized) {
-      // 미리보기만 좌우 반전된 경우(전면 카메라) 정지된 화면 기준으로 x를 뒤집는다.
-      const oriented = previewMirrored ? { ...normalized, x: 1 - normalized.x - normalized.width } : normalized;
-      viewfinderBox = fitBox(toScreenBox(oriented, photoSize, screen), screen);
-    }
-  }
-
   return (
     <View style={styles.container} onLayout={handleLayout}>
       {isWeb ? (
         <WebCameraView
           ref={webCameraRef}
-          onReady={({ mirrored }) => {
+          onReady={() => {
             setCaptureError(null);
-            setPreviewMirrored(mirrored);
             setIsCameraReady(true);
           }}
           onError={(message) => {
@@ -448,31 +365,6 @@ export default function ScanCameraScreen() {
         <Viewfinder box={defaultBox} />
       )}
       {isUploading && <Viewfinder box={defaultBox} scanning />}
-      {phase === 'recognized' && <Viewfinder box={viewfinderBox} />}
-
-      {phase === 'recognized' && scanId != null && (
-        <View style={[styles.cardsArea, { top: cardsTop }]}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_SNAP}
-            decelerationRate="fast"
-            onMomentumScrollEnd={handleCardScroll}
-            onScrollEndDrag={handleCardScroll}
-            contentContainerStyle={{ paddingLeft: CARD_LEFT, paddingRight: screen.width - CARD_LEFT - CARD_WIDTH, gap: CARD_GAP }}>
-            {objects.map((object) => (
-              <ObjectCard key={object.objectId} object={object} photo={photo} onOpen={() => openObject(object)} />
-            ))}
-          </ScrollView>
-          {objects.length > 1 && (
-            <View style={styles.dots}>
-              {objects.map((object, index) => (
-                <View key={object.objectId} style={[styles.dot, index === selected && styles.dotActive]} />
-              ))}
-            </View>
-          )}
-        </View>
-      )}
 
       {(uploadStatus || captureError) && (
         <View style={[styles.statusWrap, { top: defaultBox.y + defaultBox.height + 16 }]}>
@@ -505,69 +397,10 @@ export default function ScanCameraScreen() {
   );
 }
 
-function ObjectCard({
-  object,
-  photo,
-  onOpen,
-}: {
-  object: ScanObjectSummary;
-  photo: CapturedPhoto | null;
-  onOpen: () => void;
-}) {
-  const info = describeItem(object.finalResult?.itemCode);
-  const naturalSize = photo?.width && photo?.height ? { width: photo.width, height: photo.height } : undefined;
-
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${info.detail} 결과 보기`} onPress={onOpen} style={styles.card}>
-      <LinearGradient colors={['rgba(28,28,28,0.8)', 'rgba(28,28,28,1)']} style={[StyleSheet.absoluteFill, styles.cardBg]} />
-      <ObjectThumb uri={photo?.uri} bbox={object.bbox} size={60} naturalSize={naturalSize} style={styles.cardThumb} />
-      <View style={styles.cardCopy}>
-        <Text style={styles.cardEyebrow} numberOfLines={1}>{info.eyebrow}</Text>
-        <Text style={styles.cardTitle} numberOfLines={1}>{info.title}</Text>
-        {info.detail !== info.title && <Text style={styles.cardDetail} numberOfLines={1}>{info.detail}</Text>}
-      </View>
-      <View style={styles.cardArrow}>
-        <PathIcon icon={ICONS.cardChevron} color="#FBFAF8" />
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.scanDark, overflow: 'hidden' },
   permissionFallback: { alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
   permissionText: { color: 'rgba(255,255,255,0.7)', fontSize: FontSize.sm },
-
-  cardsArea: { position: 'absolute', left: 0, right: 0 },
-  card: {
-    width: CARD_WIDTH,
-    height: 92,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(188,231,210,0.8)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 24,
-    paddingRight: 22,
-    overflow: 'hidden',
-  },
-  cardBg: { borderRadius: 16 },
-  cardThumb: { backgroundColor: 'rgba(255,255,255,0.06)' },
-  cardCopy: { flex: 1, marginLeft: 8, paddingRight: 8 },
-  cardEyebrow: { fontSize: 14, lineHeight: 16, color: '#D2D4DA' },
-  cardTitle: { fontSize: 16, lineHeight: 20, fontWeight: '700', color: '#FFFFFF' },
-  cardDetail: { marginTop: 1, fontSize: 16, lineHeight: 20, fontWeight: '600', color: ScanColors.green },
-  cardArrow: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: ScanColors.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dots: { marginTop: 18, flexDirection: 'row', justifyContent: 'center', gap: 15 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#E5E5E4' },
-  dotActive: { backgroundColor: ScanColors.green },
 
   statusWrap: { position: 'absolute', left: 24, right: 24, alignItems: 'center', pointerEvents: 'none' },
   uploadStatus: {
