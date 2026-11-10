@@ -23,18 +23,6 @@ export const ScanColors = {
   tabInk: '#1E1E1E',
 } as const;
 
-// 디자인의 카드 그림자: 오프셋 없이 blur 6, 불투명도 25%.
-export const cardShadow = Platform.select({
-  web: { boxShadow: '0 0 6px rgba(0,0,0,0.25)' },
-  default: {
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-}) as object;
-
 // 상태바 아래에서 헤더가 시작하는 위치. 앱은 노치 높이(최소 44)를 비워 두지만,
 // 웹은 브라우저가 이미 상태바 영역을 따로 차지하므로 페이지가 알려주는 안전 영역만 쓴다.
 export function statusBarInset(safeAreaTop: number) {
@@ -43,43 +31,25 @@ export function statusBarInset(safeAreaTop: number) {
 
 export type ItemGroup = 'plastic' | 'glass' | 'can' | 'paper' | 'vinyl' | 'styrofoam' | 'other';
 
-export type ItemInfo = {
-  group: ItemGroup;
-  // 카드 윗줄에 작게 보이는 영문 분류. 알려진 품목이 아니면 서버가 준 코드를 그대로 쓴다.
-  eyebrow: string;
-  // 카드 제목 (예: 플라스틱)
-  title: string;
-  // 카드/문장에 쓰는 품목 이름 (예: 페트병 (PET))
-  detail: string;
-  // 재질 선택값 (예: PET)
-  material: string;
-  // 종류 선택값 (예: 플라스틱 용기)
-  kind: string;
-};
+export type ItemInfo = { group: ItemGroup };
 
-// 백엔드 itemCode / 카테고리 code를 디자인에 나오는 표기로 바꾼다. 순서가 중요하다. (PAPER_PACK이 PAPER보다 먼저)
-const ITEM_RULES: { test: RegExp; info: Omit<ItemInfo, 'eyebrow'> & { eyebrow?: string } }[] = [
-  // 인식하지 못한 물건(UNKNOWN)은 일반쓰레기로 보여준다. 사용자는 종류를 직접 바꿀 수 있다.
-  { test: /UNKNOWN|인식\s?불가/, info: { group: 'other', eyebrow: 'general', title: '일반쓰레기', detail: '일반쓰레기', material: '일반쓰레기', kind: '일반쓰레기' } },
-  { test: /PET/, info: { group: 'plastic', title: '플라스틱', detail: '페트병 (PET)', material: 'PET', kind: '플라스틱 용기' } },
-  { test: /GLASS|유리/, info: { group: 'glass', title: '유리병', detail: '유리 (GLASS)', material: '유리', kind: '유리병' } },
-  { test: /CAN|캔/, info: { group: 'can', title: '캔류', detail: '캔 (CAN)', material: '캔', kind: '캔류' } },
-  { test: /PAPER[_ ]?PACK|종이팩/, info: { group: 'paper', title: '종이팩', detail: '종이팩 (PAPER PACK)', material: '종이팩', kind: '종이팩' } },
-  { test: /PAPER|종이/, info: { group: 'paper', title: '종이류', detail: '종이 (PAPER)', material: '종이', kind: '종이류' } },
-  { test: /VINYL|비닐/, info: { group: 'vinyl', title: '비닐류', detail: '비닐 (VINYL)', material: '비닐', kind: '비닐류' } },
-  { test: /STYRO|스티로폼/, info: { group: 'styrofoam', title: '스티로폼', detail: '스티로폼 (STYROFOAM)', material: '스티로폼', kind: '스티로폼' } },
-  { test: /PLASTIC|플라스틱/, info: { group: 'plastic', title: '플라스틱', detail: '플라스틱 (PLASTIC)', material: '플라스틱', kind: '플라스틱 용기' } },
+// 백엔드 itemCode / 카테고리 code·이름을 가이드 탭의 분류(아이콘·색)로 묶는다.
+// 순서가 중요하다. (PAPER_PACK이 PAPER보다 먼저)
+const ITEM_GROUP_RULES: { test: RegExp; group: ItemGroup }[] = [
+  { test: /UNKNOWN|인식\s?불가/, group: 'other' },
+  { test: /PET/, group: 'plastic' },
+  { test: /GLASS|유리/, group: 'glass' },
+  { test: /CAN|캔/, group: 'can' },
+  { test: /PAPER[_ ]?PACK|종이팩/, group: 'paper' },
+  { test: /PAPER|종이/, group: 'paper' },
+  { test: /VINYL|비닐/, group: 'vinyl' },
+  { test: /STYRO|스티로폼/, group: 'styrofoam' },
+  { test: /PLASTIC|플라스틱/, group: 'plastic' },
 ];
 
 export function describeItem(code?: string | null, name?: string | null): ItemInfo {
   const value = `${code ?? ''} ${name ?? ''}`.toUpperCase();
-  for (const rule of ITEM_RULES) {
-    if (rule.test.test(value)) {
-      return { ...rule.info, eyebrow: rule.info.eyebrow ?? rule.info.group };
-    }
-  }
-  const fallback = name || code || '물건';
-  return { group: 'other', eyebrow: (code || 'item').toLowerCase(), title: fallback, detail: fallback, material: fallback, kind: fallback };
+  return { group: ITEM_GROUP_RULES.find((rule) => rule.test.test(value))?.group ?? 'other' };
 }
 
 // 서버 품목 코드의 한글 이름. 서버가 이름을 비우거나 영어로 줘도 화면에는 영어 코드가 나오지 않게 한다.
