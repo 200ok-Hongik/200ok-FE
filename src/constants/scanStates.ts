@@ -15,13 +15,22 @@ const STATE_META: { names: string[]; meta: StateMeta }[] = [
   { names: ['istransparent', 'transparent'], meta: { label: '투명 여부', on: '투명', off: '불투명' } },
 ];
 
-function normalizeName(name: string) {
+// 품목이 달라도 같은 상태를 가리키는 항목을 이어 붙일 때 쓰는 이름. (예: hasLabel, HAS_LABEL → haslabel)
+export function stateKey(name: string) {
   return name.toLowerCase().replace(/[^a-z]/g, '');
+}
+
+// 사용자가 품목을 바꿔서 새로 생긴 상태 항목의 처음 값. 문제가 없는 쪽(라벨·뚜껑·오염 없음, 비어 있음, 투명, 압착함)으로 둔다.
+// 화면에서 하나씩 고칠 수 있다.
+export function defaultStateValue(name: string) {
+  const key = stateKey(name);
+  const positive = ['isempty', 'istransparent', 'iscrushed', 'iscompressed', 'ispressed', 'isflattened'];
+  return String(positive.includes(key));
 }
 
 // 화면에 보여줄 수 있는 항목이면 이름과 값 문구를, 아니면 null을 돌려준다.
 export function stateMeta(name: string): StateMeta | null {
-  const normalized = normalizeName(name);
+  const normalized = stateKey(name);
   return STATE_META.find((entry) => entry.names.includes(normalized))?.meta ?? null;
 }
 

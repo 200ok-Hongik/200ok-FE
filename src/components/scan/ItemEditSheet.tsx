@@ -1,27 +1,36 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ScanSheet } from '@/components/scan/ScanSheet';
 import { Text } from '@/components/ui/Text';
 import { isGeneralWasteCode } from '@/constants/generalWaste';
 import { categoryDisplayName, ScanColors } from '@/constants/scanDesign';
-import type { ReviewItem } from '@/constants/scanReview';
+import { statesForCategory, type ReviewChecklist, type ReviewItem, type ReviewState } from '@/constants/scanReview';
 import { isStateOn, stateMeta } from '@/constants/scanStates';
 import type { TrashCategory } from '@/services/api';
 
-export type ItemDraft = { categoryId: number; values: Record<number, string> };
+export type ItemDraft = { categoryId: number; states: ReviewState[] };
 
 type Props = {
   item: ReviewItem;
   categories: TrashCategory[];
+  // 품목마다 확인 항목(checklistId)이 달라서, 품목을 바꾸면 새 품목의 항목을 받아 온다.
+  loadChecklist: (categoryId: number) => Promise<ReviewChecklist>;
   onClose: () => void;
   onSave: (draft: ItemDraft) => void;
 };
 
 // 연필 버튼을 눌렀을 때 뜨는 시트. 품목을 다시 고르고, 이 물건에서 AI가 읽은 상태(오염, 라벨, 뚜껑 등)를 하나씩 고칠 수 있다.
 // 물건이 바뀔 때마다 새로 만들어지도록 부모에서 key를 준다.
-export function ItemEditSheet({ item, categories, onClose, onSave }: Props) {
-  const [draft, setDraft] = useState<ItemDraft>(() => ({ categoryId: item.categoryId, values: { ...item.values } }));
+export function ItemEditSheet({ item, categories, loadChecklist, onClose, onSave }: Props) {
+  const [draft, setDraft] = useState<ItemDraft>(() => ({
+    categoryId: item.categoryId,
+    states: item.states.map((state) => ({ ...state })),
+  }));
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  // 품목을 빠르게 연달아 바꿨을 때 늦게 도착한 응답이 최신 선택을 덮어쓰지 않게 한다.
+  const latestRequest = useRef(0);
 
   // 일반쓰레기는 목록 맨 아래에 둔다.
   const options = useMemo(() => {
@@ -33,16 +42,42 @@ export function ItemEditSheet({ item, categories, onClose, onSave }: Props) {
   // 화면에 보여줄 이름이 있는 상태만 고치게 한다. 나머지 항목의 값은 그대로 서버에 보낸다.
   const editableStates = useMemo(
     () =>
-      item.detail.states.flatMap((state) => {
-        const meta = stateMeta(state.checkItemName);
+      draft.states.flatMap((state) => {
+        const meta = stateMeta(state.name);
         return meta ? [{ state, meta }] : [];
       }),
-    [item.detail.states]
+    [draft.states]
   );
 
-  const changed =
-    draft.categoryId !== item.categoryId ||
-    item.detail.states.some((state) => draft.values[state.checklistId] !== item.values[state.checklistId]);
+  const changed = draft.categoryId !== item.categoryId || JSON.stringify(draft.states) !== JSON.stringify(item.states);
+
+  const selectCategory = async (categoryId: number) => {
+    if (categoryId === draft.categoryId) return;
+    const previous = draft;
+    const requestId = ++latestRequest.current;
+    setDraft({ ...previous, categoryId });
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const checklist = await loadChecklist(categoryId);
+      if (requestId !== latestRequest.current) return;
+      setDraft({ categoryId, states: statesForCategory(checklist, previous.states) });
+    } catch (reason) {
+      console.error(reason);
+      if (requestId !== latestRequest.current) return;
+      // 새 품목의 항목을 받지 못하면 예전 품목의 번호를 그대로 보내게 되므로, 선택을 되돌린다.
+      setDraft(previous);
+      setLoadError(true);
+    } finally {
+      if (requestId === latestRequest.current) setLoading(false);
+    }
+  };
+
+  const setState = (checklistId: number, value: boolean) =>
+    setDraft({
+      ...draft,
+      states: draft.states.map((state) => (state.checklistId === checklistId ? { ...state, value: String(value) } : state)),
+    });
 
   return (
     <ScanSheet
@@ -60,7 +95,7 @@ export function ItemEditSheet({ item, categories, onClose, onSave }: Props) {
               key={category.categoryId}
               accessibilityRole="button"
               accessibilityState={{ selected }}
-              onPress={() => setDraft({ ...draft, categoryId: category.categoryId })}
+              onPress={() => selectCategory(category.categoryId)}
               style={[styles.option, selected && styles.optionOn]}>
               <Text style={[styles.optionText, selected && styles.optionTextOn]} numberOfLines={1}>
                 {categoryDisplayName(category.code, category.name)}
@@ -71,22 +106,23 @@ export function ItemEditSheet({ item, categories, onClose, onSave }: Props) {
         })}
       </View>
 
-      {editableStates.length > 0 && (
+      {loadError && <Text style={styles.errorText}>상태 항목을 불러오지 못했어요. 다시 선택해 주세요.</Text>}
+      {loading && <Text style={styles.loadingText}>상태 항목을 불러오는 중…</Text>}
+
+      {!loading && editableStates.length > 0 && (
         <>
           <Text style={[styles.sectionLabel, { marginTop: 24 }]}>상태</Text>
           <View style={styles.stateList}>
             {editableStates.map(({ state, meta }, index) => {
-              const on = isStateOn(draft.values[state.checklistId] ?? state.statusValue);
-              const set = (value: boolean) =>
-                setDraft({ ...draft, values: { ...draft.values, [state.checklistId]: String(value) } });
+              const on = isStateOn(state.value);
               return (
                 <View key={state.checklistId} style={[styles.stateRow, index === 0 && { borderTopWidth: 0 }]}>
                   <Text style={styles.stateLabel}>{meta.label}</Text>
                   <View style={styles.segment}>
-                    <Pressable accessibilityRole="button" onPress={() => set(false)} style={[styles.segmentItem, !on && styles.segmentOn]}>
+                    <Pressable accessibilityRole="button" onPress={() => setState(state.checklistId, false)} style={[styles.segmentItem, !on && styles.segmentOn]}>
                       <Text style={[styles.segmentText, !on && styles.segmentTextOn]}>{meta.off}</Text>
                     </Pressable>
-                    <Pressable accessibilityRole="button" onPress={() => set(true)} style={[styles.segmentItem, on && styles.segmentOn]}>
+                    <Pressable accessibilityRole="button" onPress={() => setState(state.checklistId, true)} style={[styles.segmentItem, on && styles.segmentOn]}>
                       <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{meta.on}</Text>
                     </Pressable>
                   </View>
@@ -101,7 +137,11 @@ export function ItemEditSheet({ item, categories, onClose, onSave }: Props) {
         <Pressable accessibilityRole="button" onPress={onClose} style={[styles.button, styles.cancel]}>
           <Text style={styles.cancelText}>취소</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => onSave(draft)} style={[styles.button, styles.confirm]}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={loading}
+          onPress={() => onSave(draft)}
+          style={[styles.button, styles.confirm, loading && { opacity: 0.5 }]}>
           <Text style={styles.confirmText}>{changed ? '수정 완료' : '이대로 둘게요'}</Text>
         </Pressable>
       </View>
@@ -130,6 +170,8 @@ const styles = StyleSheet.create({
   optionCheck: { fontSize: 14, fontWeight: '700', color: ScanColors.green },
 
   stateList: { marginTop: 4 },
+  loadingText: { marginTop: 24, fontSize: 13, color: ScanColors.gray },
+  errorText: { marginTop: 16, fontSize: 13, color: '#B42318' },
   stateRow: {
     height: 56,
     flexDirection: 'row',

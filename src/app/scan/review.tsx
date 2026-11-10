@@ -14,7 +14,7 @@ import { SsokLogo } from '@/components/ui/SsokLogo';
 import { Text } from '@/components/ui/Text';
 import { buildGeneralWasteGuide, isGeneralWasteCode } from '@/constants/generalWaste';
 import { categoryDisplayName, pruneObjects, ScanColors, statusBarInset } from '@/constants/scanDesign';
-import { groupResults, type ReviewGroup, type ReviewItem } from '@/constants/scanReview';
+import { groupResults, type ReviewChecklist, type ReviewGroup, type ReviewItem } from '@/constants/scanReview';
 import {
   confirmScanObjectResult,
   createCalendar,
@@ -22,6 +22,7 @@ import {
   getScanObject,
   getScanObjects,
   getTrashCategories,
+  getTrashCategoryGuide,
   type DisposalGuide,
   type TrashCategory,
 } from '@/services/api';
@@ -90,7 +91,11 @@ export default function ScanReviewScreen() {
               bbox: object.bbox,
               detail,
               categoryId: detail.category.categoryId,
-              values: Object.fromEntries(detail.states.map((state) => [state.checklistId, String(state.statusValue)])),
+              states: detail.states.map((state) => ({
+                checklistId: state.checklistId,
+                name: state.checkItemName,
+                value: String(state.statusValue),
+              })),
             };
           })
         );
@@ -117,11 +122,32 @@ export default function ScanReviewScreen() {
   );
   const editing = items?.find((item) => item.objectId === editingId) ?? null;
 
+  // 품목별 확인 항목은 한 번 받으면 다시 받지 않는다. AI가 처음 고른 품목은 이미 받아 둔 항목을 쓴다.
+  const checklistCache = useRef(new Map<number, ReviewChecklist>());
+  const loadChecklist = async (item: ReviewItem, categoryId: number): Promise<ReviewChecklist> => {
+    if (categoryId === item.detail.category.categoryId) {
+      return item.detail.states.map((state) => ({ checklistId: state.checklistId, checkItemName: state.checkItemName }));
+    }
+    const cached = checklistCache.current.get(categoryId);
+    if (cached) return cached;
+    let checklist: ReviewChecklist = [];
+    try {
+      const guide = await getTrashCategoryGuide(categoryId);
+      checklist = guide.checkItems.map((entry) => ({ checklistId: entry.checklistId, checkItemName: entry.checkItemName }));
+    } catch (reason) {
+      // 일반쓰레기(인식 불가)는 서버에 안내가 없어서 확인 항목도 없다.
+      const category = categories.find((entry) => entry.categoryId === categoryId);
+      if (!category || !isGeneralWasteCode(category.code)) throw reason;
+    }
+    checklistCache.current.set(categoryId, checklist);
+    return checklist;
+  };
+
   const applyEdit = (draft: ItemDraft) => {
     if (!editing) return;
     setItems((current) =>
       (current ?? []).map((item) =>
-        item.objectId === editing.objectId ? { ...item, categoryId: draft.categoryId, values: draft.values } : item
+        item.objectId === editing.objectId ? { ...item, categoryId: draft.categoryId, states: draft.states } : item
       )
     );
     setEditingId(null);
@@ -133,32 +159,40 @@ export default function ScanReviewScreen() {
     try {
       setIsConfirming(true);
       setActionError(null);
-      const entries = await Promise.all(
-        items.map(async (item) => {
-          const category = categoryOf(item);
+      // 같은 스캔의 물건을 서버가 동시에 고치다 실패하지 않도록 한 물건씩 차례로 처리한다.
+      const entries: { item: ReviewItem; guide: DisposalGuide; categoryName: string }[] = [];
+      for (const item of items) {
+        const category = categoryOf(item);
+        let step = '확정';
+        try {
           const confirmed = await confirmScanObjectResult(sid, item.objectId, {
             categoryId: item.categoryId,
-            states: item.detail.states.map((state) => ({
-              checklistId: state.checklistId,
-              statusValue: item.values[state.checklistId] ?? String(state.statusValue),
-            })),
+            // 지금 고른 품목의 확인 항목 번호로 보낸다. (품목을 바꿨다면 새 품목의 번호)
+            states: item.states.map((state) => ({ checklistId: state.checklistId, statusValue: state.value })),
           });
+          step = '배출 안내';
           let guide: DisposalGuide;
           try {
             guide = await getObjectDisposalGuide(sid, item.objectId);
           } catch (guideError) {
-            // 일반쓰레기(인식 불가)는 서버가 가이드를 주지 않을 수 있어서 앱의 기본 안내로 대신한다.
-            if (!isGeneralWasteCode(category.code) || !confirmed.decisionId) throw guideError;
-            guide = buildGeneralWasteGuide(sid, confirmed.decisionId, item.categoryId);
+            // 일반쓰레기(인식 불가)는 서버가 안내를 주지 않을 수 있어서 앱의 기본 안내로 대신한다.
+            // 서버가 판단 번호를 주지 않아도 안내는 보여주고, 배출 기록 저장만 건너뛴다.
+            if (!isGeneralWasteCode(category.code)) throw guideError;
+            guide = buildGeneralWasteGuide(sid, confirmed.decisionId ?? 0, item.categoryId);
           }
-          return { item, guide, categoryName: categoryDisplayName(category.code, category.name) };
-        })
-      );
+          entries.push({ item, guide, categoryName: categoryDisplayName(category.code, category.name) });
+        } catch (reason) {
+          console.error(reason);
+          const status = reason instanceof Error ? reason.message.match(/SSOK API (\d+)/)?.[1] : undefined;
+          throw new Error(`${item.number}번 물건 ${step} ${status ?? '연결 오류'}`);
+        }
+      }
       setGroups(groupResults(entries));
       setStep('result');
     } catch (reason) {
-      console.error(reason);
-      setActionError('결과를 확정하지 못했어요. 다시 시도해주세요.');
+      // 어느 물건의 어느 단계에서 실패했는지 화면에 남긴다.
+      const detail = reason instanceof Error ? reason.message : '';
+      setActionError(`결과를 확정하지 못했어요. 다시 시도해주세요.${detail ? ` (${detail})` : ''}`);
     } finally {
       setIsConfirming(false);
     }
@@ -312,7 +346,14 @@ export default function ScanReviewScreen() {
               </View>
 
               {editing && (
-                <ItemEditSheet key={editing.objectId} item={editing} categories={categories} onClose={() => setEditingId(null)} onSave={applyEdit} />
+                <ItemEditSheet
+                  key={editing.objectId}
+                  item={editing}
+                  categories={categories}
+                  loadChecklist={(categoryId) => loadChecklist(editing, categoryId)}
+                  onClose={() => setEditingId(null)}
+                  onSave={applyEdit}
+                />
               )}
             </>
           )}

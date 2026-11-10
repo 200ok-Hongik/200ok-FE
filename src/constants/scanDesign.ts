@@ -82,9 +82,24 @@ export function describeItem(code?: string | null, name?: string | null): ItemIn
   return { group: 'other', eyebrow: (code || 'item').toLowerCase(), title: fallback, detail: fallback, material: fallback, kind: fallback };
 }
 
-// 서버가 내려주는 품목 이름을 화면용 이름으로 바꾼다. (UNKNOWN → 일반쓰레기, 나머지는 서버 이름 그대로)
+// 서버 품목 코드의 한글 이름. 서버가 이름을 비우거나 영어로 줘도 화면에는 영어 코드가 나오지 않게 한다.
+const KOREAN_NAME_BY_CODE: Record<string, string> = {
+  CLEAR_PET_BOTTLE: '무색 페트병',
+  PLASTIC: '플라스틱',
+  CAN: '캔류',
+  GLASS_BOTTLE: '유리병',
+  VINYL: '비닐',
+  PAPER: '종이',
+  PAPER_PACK: '종이팩',
+  STYROFOAM: '스티로폼',
+};
+
+// 서버가 내려주는 품목 이름을 화면용 이름으로 바꾼다.
+// UNKNOWN → 일반쓰레기, 한글 이름은 그대로, 이름이 없거나 영어면 코드로 한글 이름을 찾고, 그것도 없으면 일반쓰레기.
 export function categoryDisplayName(code?: string | null, name?: string | null) {
-  return /UNKNOWN|인식\s?불가/.test(`${code ?? ''} ${name ?? ''}`.toUpperCase()) ? '일반쓰레기' : name || code || '물건';
+  if (/UNKNOWN|인식\s?불가/.test(`${code ?? ''} ${name ?? ''}`.toUpperCase())) return '일반쓰레기';
+  if (name && /[가-힣]/.test(name)) return name;
+  return KOREAN_NAME_BY_CODE[(code ?? '').trim().toUpperCase()] ?? '일반쓰레기';
 }
 
 export type Box = { x: number; y: number; width: number; height: number };
