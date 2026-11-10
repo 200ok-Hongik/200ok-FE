@@ -16,6 +16,8 @@ import { ScanSheet } from '@/components/scan/ScanSheet';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { CATEGORY_ICONS } from '@/constants/categoryIcons';
 import { categoryDisplayName } from '@/constants/scanDesign';
+import { ObjectThumb } from '@/components/scan/ObjectThumb';
+import { getScheduleItemInfos, type ScheduleItemInfo } from '@/services/scheduleItems';
 import { getLastSeenNotificationId, setLastSeenNotificationId } from '@/services/notificationSeen';
 import {
   completeCalendar,
@@ -50,6 +52,8 @@ export default function HomeScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [monthlyRecycleCount, setMonthlyRecycleCount] = useState(0);
   const [completingId, setCompletingId] = useState<number | null>(null);
+  // 오늘 일정마다 "어떤 물건이었는지" 보여 줄 사진. calendarId → 사진과 물건 위치
+  const [scheduleInfos, setScheduleInfos] = useState<Record<number, ScheduleItemInfo>>({});
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [lastSeenNotificationId, setLastSeenId] = useState(0);
   const [frequentItems, setFrequentItems] = useState<FrequentScanCategory[]>([]);
@@ -93,6 +97,19 @@ export default function HomeScreen() {
       setFeedbackVisible(false);
     }
   };
+
+  // 일정이 바뀌었을 때만(배출 완료 처리로는 다시 받지 않는다) 일정별 물건 사진을 찾는다. 못 찾아도 일정은 그대로 보인다.
+  const scheduleKey = (homeSummary?.todaySchedules ?? []).map((item) => item.calendarId).join(',');
+  useEffect(() => {
+    if (!today || !scheduleKey) return;
+    let cancelled = false;
+    getScheduleItemInfos(today)
+      .then((infos) => !cancelled && setScheduleInfos(infos))
+      .catch((error) => console.warn('일정별 물건 사진을 불러오지 못했습니다.', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [today, scheduleKey]);
 
   // 오늘 배출 일정을 "배출 완료"로 바꾼다. 완료된 일정은 이번 달 누적 재활용 횟수에 바로 반영한다.
   const handleCompleteSchedule = async (calendarId: number) => {
@@ -200,8 +217,10 @@ export default function HomeScreen() {
                 : `${scheduled.getHours() < 12 ? '오전' : '오후'} ${scheduled.getHours() % 12 || 12}:${String(scheduled.getMinutes()).padStart(2, '0')}`;
               // 서버가 일반쓰레기 품목을 "인식 불가"라고 부르므로, 다른 화면과 같이 "일반쓰레기"로 보여준다.
               const scheduleName = categoryDisplayName(undefined, item.categoryName);
+              const info = scheduleInfos[item.calendarId];
               return (
                 <View key={item.calendarId} style={styles.scheduleRow}>
+                  {info && <ObjectThumb uri={info.imageUrl} bbox={info.bbox} size={48} style={styles.scheduleThumb} />}
                   <View style={styles.scheduleCopy}>
                     <Text style={styles.scheduleName} numberOfLines={1}>{scheduleName}</Text>
                     <Text style={styles.scheduleTime}>{timeText} {item.isCompleted ? '배출 완료' : '배출 예정'}</Text>
@@ -346,6 +365,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  scheduleThumb: { marginRight: 12 },
   scheduleCopy: { flex: 1, paddingRight: 10 },
   scheduleName: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: '#111827' },
   scheduleTime: { marginTop: 2, fontSize: 12, lineHeight: 16, color: '#6B7280' },
