@@ -11,7 +11,7 @@ export type WebCameraPhoto = { uri: string; width: number; height: number };
 export type WebCameraHandle = {
   takePictureAsync: () => Promise<WebCameraPhoto>;
   pausePreview: () => void;
-  resumePreview: () => void;
+  resumePreview: () => void | Promise<void>;
 };
 
 type Props = {
@@ -83,6 +83,8 @@ async function tuneTrack(track: MediaStreamTrack) {
 export function WebCameraView({ ref, onReady, onError }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // 영상이 멈췄을 때 카메라를 다시 여는 함수. 아래 effect에서 채운다.
+  const restartRef = useRef<(() => Promise<void>) | null>(null);
   // 전면 카메라(노트북 웹캠·셀카)는 거울처럼 보여주는 게 자연스럽다. 후면 카메라는 그대로 보여준다.
   // 화면(CSS)만 뒤집고, 촬영해서 서버로 보내는 사진은 항상 원본 방향이다.
   const [mirrored, setMirrored] = useState(false);
@@ -116,8 +118,16 @@ export function WebCameraView({ ref, onReady, onError }: Props) {
     pausePreview() {
       videoRef.current?.pause();
     },
-    resumePreview() {
-      void videoRef.current?.play().catch(() => undefined);
+    async resumePreview() {
+      const video = videoRef.current;
+      if (!video) return;
+      await video.play().catch(() => undefined);
+      // 모바일 브라우저는 화면을 벗어나 있는 동안 카메라 트랙을 끊거나 재생을 막을 수 있다.
+      // 잠시 뒤에도 영상이 안 나오면(검정 화면) 스트림을 다시 연다.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      const track = streamRef.current?.getVideoTracks()[0];
+      const stalled = !track || track.readyState !== 'live' || video.paused || video.readyState < 2;
+      if (stalled) await restartRef.current?.();
     },
   }));
 
@@ -168,10 +178,17 @@ export function WebCameraView({ ref, onReady, onError }: Props) {
       }
     }
 
+    restartRef.current = async () => {
+      console.info('[SSOK Camera] 카메라 영상이 멈춰 있어 스트림을 다시 열어요.');
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (!cancelled) await start();
+    };
     void start();
 
     return () => {
       cancelled = true;
+      restartRef.current = null;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     };
