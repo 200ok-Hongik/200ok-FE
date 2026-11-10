@@ -7,7 +7,8 @@ import type { ScanObjectSummary } from '@/services/api';
 
 export type BoxItem = {
   id: string;
-  number: number;
+  // 물건이 하나뿐인 곳(상세 시트)에서는 번호 없이 윤곽선만 보여준다.
+  number?: number;
   bbox: ScanObjectSummary['bbox'];
 };
 
@@ -79,7 +80,7 @@ export function PhotoBoxes({ uri, naturalSize, items, width, height, selectedId,
           <Pressable
             key={item.id}
             accessibilityRole="button"
-            accessibilityLabel={`${item.number}번 물건`}
+            accessibilityLabel={item.number != null ? `${item.number}번 물건` : '물건'}
             onPress={() => onSelect?.(item.id)}
             style={[
               styles.box,
@@ -93,9 +94,11 @@ export function PhotoBoxes({ uri, naturalSize, items, width, height, selectedId,
                 backgroundColor: selected ? 'rgba(255,255,255,0.14)' : 'transparent',
               },
             ]}>
-            <View style={[styles.badge, { backgroundColor: color }]}>
-              <Text style={styles.badgeText}>{item.number}</Text>
-            </View>
+            {item.number != null && (
+              <View style={[styles.badge, { backgroundColor: color }]}>
+                <Text style={styles.badgeText}>{item.number}</Text>
+              </View>
+            )}
           </Pressable>
         );
       })}

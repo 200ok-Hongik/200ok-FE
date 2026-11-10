@@ -11,6 +11,7 @@ import { FeedbackModal } from '@/components/scan/FeedbackModal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
+import { ScheduleDetailSheet } from '@/components/home/ScheduleDetailSheet';
 import { WelcomeModal } from '@/components/home/WelcomeModal';
 import { ScanSheet } from '@/components/scan/ScanSheet';
 import { NotificationBell } from '@/components/ui/NotificationBell';
@@ -54,6 +55,8 @@ export default function HomeScreen() {
   const [completingId, setCompletingId] = useState<number | null>(null);
   // 오늘 일정마다 "어떤 물건이었는지" 보여 줄 사진. calendarId → 사진과 물건 위치
   const [scheduleInfos, setScheduleInfos] = useState<Record<number, ScheduleItemInfo>>({});
+  // 상세 시트로 보고 있는 일정
+  const [detailCalendarId, setDetailCalendarId] = useState<number | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [lastSeenNotificationId, setLastSeenId] = useState(0);
   const [frequentItems, setFrequentItems] = useState<FrequentScanCategory[]>([]);
@@ -220,11 +223,19 @@ export default function HomeScreen() {
               const info = scheduleInfos[item.calendarId];
               return (
                 <View key={item.calendarId} style={styles.scheduleRow}>
-                  {info && <ObjectThumb uri={info.imageUrl} bbox={info.bbox} size={48} style={styles.scheduleThumb} />}
-                  <View style={styles.scheduleCopy}>
-                    <Text style={styles.scheduleName} numberOfLines={1}>{scheduleName}</Text>
-                    <Text style={styles.scheduleTime}>{timeText} {item.isCompleted ? '배출 완료' : '배출 예정'}</Text>
-                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${scheduleName} 상세 보기`}
+                    onPress={() => setDetailCalendarId(item.calendarId)}
+                    style={styles.scheduleMain}>
+                    {info?.scan && (
+                      <ObjectThumb uri={info.scan.imageUrl} bbox={info.scan.bbox} size={52} mode="context" style={styles.scheduleThumb} />
+                    )}
+                    <View style={styles.scheduleCopy}>
+                      <Text style={styles.scheduleName} numberOfLines={1}>{scheduleName}</Text>
+                      <Text style={styles.scheduleTime}>{timeText} {item.isCompleted ? '배출 완료' : '배출 예정'}</Text>
+                    </View>
+                  </Pressable>
                   {item.isCompleted ? (
                     <View style={styles.scheduleDone}>
                       <Ionicons name="checkmark" size={14} color="#16A34A" />
@@ -318,6 +329,30 @@ export default function HomeScreen() {
 
       <WelcomeModal visible={reminderVisible} onClose={() => setReminderVisible(false)} />
 
+      {(() => {
+        const detailSchedule = homeSummary?.todaySchedules.find((item) => item.calendarId === detailCalendarId);
+        if (!detailSchedule) return null;
+        const scheduled = new Date(detailSchedule.scheduledAt);
+        const timeText = Number.isNaN(scheduled.getTime())
+          ? ''
+          : `${scheduled.getHours() < 12 ? '오전' : '오후'} ${scheduled.getHours() % 12 || 12}:${String(scheduled.getMinutes()).padStart(2, '0')}`;
+        return (
+          <ScheduleDetailSheet
+            visible
+            onClose={() => setDetailCalendarId(null)}
+            name={categoryDisplayName(undefined, detailSchedule.categoryName)}
+            statusText={`${timeText} ${detailSchedule.isCompleted ? '배출 완료' : '배출 예정'}`}
+            info={scheduleInfos[detailSchedule.calendarId]}
+            completed={detailSchedule.isCompleted}
+            completing={completingId === detailSchedule.calendarId}
+            onComplete={async () => {
+              await handleCompleteSchedule(detailSchedule.calendarId);
+              setDetailCalendarId(null);
+            }}
+          />
+        );
+      })()}
+
       <ScanSheet
         visible={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
@@ -365,7 +400,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  scheduleThumb: { marginRight: 12 },
+  scheduleMain: { flex: 1, minHeight: 60, flexDirection: 'row', alignItems: 'center' },
+  scheduleThumb: { marginRight: 12, borderRadius: 12 },
   scheduleCopy: { flex: 1, paddingRight: 10 },
   scheduleName: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: '#111827' },
   scheduleTime: { marginTop: 2, fontSize: 12, lineHeight: 16, color: '#6B7280' },
