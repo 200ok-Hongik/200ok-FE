@@ -1,80 +1,72 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, type Href } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
-import { ScanColors } from '@/constants/scanDesign';
-import { ICONS } from './iconPaths';
-import { PathIcon } from './PathIcon';
+import {
+  TAB_BAR_HEIGHT,
+  TAB_BAR_PADDING_BOTTOM,
+  TAB_BAR_PADDING_TOP,
+  TAB_ICON_SIZE,
+  TAB_LABEL_FONT_SIZE,
+} from '@/constants/tabBar';
+import { Colors } from '@/constants/theme';
 
+type IconName = keyof typeof Ionicons.glyphMap;
+
+// 홈 탭바((tabs)/_layout.tsx)와 같은 아이콘·이름·크기로 맞춘다. 스캔 화면에서만 탭바가 따로 그려져서,
+// 모양이 다르면 탭을 누를 때마다 아이콘이 이리저리 움직여 보인다.
 const TABS = [
-  { label: '홈', icon: ICONS.tabHome, route: '/(tabs)' },
-  { label: '기록', icon: ICONS.tabHistory, route: '/(tabs)/history' },
-  { label: '스캔', icon: ICONS.tabScan, route: '/scan/camera' },
-  { label: '가이드', icon: ICONS.tabGuide, route: '/(tabs)/guide' },
-  { label: 'My', icon: ICONS.tabMy, route: '/(tabs)/mypage' },
-] as const satisfies readonly { label: string; icon: unknown; route: Href }[];
-
-type Props = {
-  // dark: 카메라 화면(어두운 그라데이션 위), light: 흰 배경
-  variant: 'dark' | 'light';
-};
-
-export const SCAN_TAB_CONTENT_HEIGHT = 58;
+  { label: '홈', icon: 'home-outline', route: '/(tabs)' },
+  { label: '기록', icon: 'time-outline', route: '/(tabs)/history' },
+  { label: '스캔', icon: 'scan-outline', route: '/scan/camera' },
+  { label: '가이드', icon: 'bookmark-outline', route: '/(tabs)/guide' },
+  { label: 'My', icon: 'person-outline', route: '/(tabs)/mypage' },
+] as const satisfies readonly { label: string; icon: IconName; route: Href }[];
 
 export function useScanTabBarHeight() {
-  const insets = useSafeAreaInsets();
-  return SCAN_TAB_CONTENT_HEIGHT + Math.max(insets.bottom, 12);
+  return TAB_BAR_HEIGHT;
 }
 
-export function ScanTabBar({ variant }: Props) {
-  const dark = variant === 'dark';
-  const height = useScanTabBarHeight();
-  const inactive = dark ? ScanColors.chipGray : ScanColors.tabInk;
-
+export function ScanTabBar() {
   return (
-    <View style={[styles.bar, { height }, !dark && styles.barLight]}>
-      {dark && (
-        <LinearGradient
-          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.4)']}
-          style={[StyleSheet.absoluteFill, styles.passThrough, { top: -30 }]}
-        />
-      )}
-      <View style={styles.row}>
-        {TABS.map((tab) => {
-          const active = tab.label === '스캔';
-          const color = active ? ScanColors.green : inactive;
-          return (
-            <Pressable
-              key={tab.label}
-              accessibilityRole="button"
-              accessibilityLabel={`${tab.label} 화면으로 이동`}
-              hitSlop={6}
-              onPress={() => router.replace(tab.route)}
-              style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
-              <View style={styles.iconBox}>
-                <PathIcon icon={tab.icon} color={color} />
-              </View>
-              <Text style={[styles.label, { color }]}>{tab.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+    <View style={styles.bar}>
+      {TABS.map((tab) => {
+        const active = tab.label === '스캔';
+        const color = active ? Colors.primary : Colors.textTertiary;
+        return (
+          <Pressable
+            key={tab.label}
+            accessibilityRole="button"
+            accessibilityLabel={`${tab.label} 화면으로 이동`}
+            hitSlop={6}
+            onPress={() => router.replace(tab.route)}
+            style={({ pressed }) => [styles.item, pressed && styles.pressed]}>
+            <Ionicons name={tab.icon} size={TAB_ICON_SIZE} color={color} />
+            <Text style={[styles.label, { color }]}>{tab.label}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, pointerEvents: 'box-none' },
-  passThrough: { pointerEvents: 'none' },
-  barLight: {
-    backgroundColor: '#FFFFFF',
-    boxShadow: '0 -2px 6px rgba(0,0,0,0.12)',
+  bar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: TAB_BAR_HEIGHT,
+    paddingTop: TAB_BAR_PADDING_TOP,
+    paddingBottom: TAB_BAR_PADDING_BOTTOM,
+    flexDirection: 'row',
+    backgroundColor: Colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: Colors.border,
   },
-  row: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 14 },
-  item: { flex: 1, alignItems: 'center' },
+  // 기본 탭바는 항목 안의 간격을 자체 계산해서 아이콘이 몇 px 더 위에 놓인다. 화면에서 재서 같은 위치로 맞춘 값이다.
+  item: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 5 },
   pressed: { opacity: 0.55 },
-  iconBox: { height: 20, alignItems: 'center', justifyContent: 'center' },
-  label: { marginTop: 5, fontSize: 12, lineHeight: 14, fontWeight: '500' },
+  label: { fontSize: TAB_LABEL_FONT_SIZE, fontWeight: '700', marginTop: 1 },
 });

@@ -349,7 +349,7 @@ export default function ScanCapturedScreen() {
         </Pressable>
       </ScrollView>
 
-      <ScanTabBar variant="light" />
+      <ScanTabBar />
 
       <ScanSheet
         visible={picker === 'component'}

@@ -392,7 +392,7 @@ export default function ScanCameraScreen() {
         )}
       </Pressable>
 
-      <ScanTabBar variant="dark" />
+      <ScanTabBar />
     </View>
   );
 }

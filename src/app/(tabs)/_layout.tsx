@@ -3,13 +3,20 @@ import { router, Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 
+import {
+  TAB_BAR_HEIGHT,
+  TAB_BAR_PADDING_BOTTOM,
+  TAB_BAR_PADDING_TOP,
+  TAB_ICON_SIZE,
+  TAB_LABEL_FONT_SIZE,
+} from '@/constants/tabBar';
 import { Colors } from '@/constants/theme';
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
 function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
   return (
-    <Ionicons name={name} size={22} color={focused ? Colors.primary : Colors.textTertiary} />
+    <Ionicons name={name} size={TAB_ICON_SIZE} color={focused ? Colors.primary : Colors.textTertiary} />
   );
 }
 
@@ -82,14 +89,14 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   tabBar: {
-    height: 78,
-    paddingTop: 8,
-    paddingBottom: 10,
+    height: TAB_BAR_HEIGHT,
+    paddingTop: TAB_BAR_PADDING_TOP,
+    paddingBottom: TAB_BAR_PADDING_BOTTOM,
     borderTopColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   label: {
-    fontSize: 12,
+    fontSize: TAB_LABEL_FONT_SIZE,
     fontWeight: '700',
     marginTop: 0,
   },
