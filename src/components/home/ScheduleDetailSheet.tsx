@@ -39,7 +39,8 @@ function fromGuide(guide: DisposalGuide): Detail {
     // 이미 지켜진 항목은 할 일이 아니라서 뺀다.
     if (!check.isSatisfied && check.guideMessage && !steps.includes(check.guideMessage)) steps.push(check.guideMessage);
   }
-  const last = guide.finalGuideMessage || guide.guideMessage;
+  // finalGuideMessage는 위 단계들을 이어 붙인 긴 문장이라 겹친다. 짧은 안내(guideMessage)를 우선한다.
+  const last = guide.guideMessage || guide.finalGuideMessage;
   if (last && !steps.includes(last)) steps.push(last);
   return {
     states: guide.checkItems

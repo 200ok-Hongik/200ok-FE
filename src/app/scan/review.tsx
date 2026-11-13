@@ -19,6 +19,7 @@ import {
   confirmScanObjectResult,
   createCalendar,
   getObjectDisposalGuide,
+  getProfile,
   getScanObject,
   getScanObjects,
   getTrashCategories,
@@ -43,6 +44,8 @@ export default function ScanReviewScreen() {
   const [items, setItems] = useState<ReviewItem[] | null>(null);
   const [categories, setCategories] = useState<TrashCategory[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // 사용자가 정한 지역. 결과 화면에 "우리 동네 기준 배출 일정"을 붙인다. 못 불러와도 화면은 그대로 동작한다.
+  const [region, setRegion] = useState<{ short: string; full: string }>({ short: '', full: '' });
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -58,6 +61,20 @@ export default function ScanReviewScreen() {
   const photo = getScanPhoto(scanId);
   const photoUri = photo?.uri ?? imageUrl;
   const naturalSize = photo?.width && photo?.height ? { width: photo.width, height: photo.height } : undefined;
+
+  useEffect(() => {
+    let cancelled = false;
+    getProfile()
+      .then((profile) => {
+        if (cancelled || !profile.region) return;
+        const { sido, gugun, dong } = profile.region;
+        setRegion({ short: `${gugun} ${dong}`, full: `${sido} ${gugun} ${dong}` });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!scanId || !Number.isFinite(sid)) {
@@ -246,6 +263,9 @@ export default function ScanReviewScreen() {
       <ReviewResult
         groups={groups}
         itemCount={items.length}
+        region={region.short}
+        regionFull={region.full}
+        acceptedItems={categories.filter((category) => !isGeneralWasteCode(category.code)).map((category) => categoryDisplayName(category.code, category.name))}
         isSaving={isSaving}
         error={actionError}
         onBack={() => {
