@@ -14,9 +14,8 @@ import type { ReviewGroup } from '@/constants/scanReview';
 type Props = {
   groups: ReviewGroup[];
   itemCount: number;
-  // 사용자가 정한 지역. 모르면 빈 문자열. (예: region "마포구 서교동", regionFull "서울특별시 마포구 서교동")
+  // 사용자가 정한 지역. 모르면 빈 문자열. (예: "마포구 서교동")
   region: string;
-  regionFull: string;
   // "배출 가능 품목"으로 보여줄 품목 이름들
   acceptedItems: string[];
   isSaving: boolean;
@@ -30,7 +29,7 @@ function scheduleText(group: Pick<ReviewGroup, 'days' | 'time'>) {
 }
 
 // 확인을 마친 물건들을 "같은 품목 + 같은 상태"끼리 묶어 한 번에 보여준다.
-export function ReviewResult({ groups, itemCount, region, regionFull, acceptedItems, isSaving, error, onBack, onSave }: Props) {
+export function ReviewResult({ groups, itemCount, region, acceptedItems, isSaving, error, onBack, onSave }: Props) {
   const insets = useSafeAreaInsets();
   const [rulesOpen, setRulesOpen] = useState(false);
 
@@ -139,7 +138,7 @@ export function ReviewResult({ groups, itemCount, region, regionFull, acceptedIt
         visible={rulesOpen}
         onClose={() => setRulesOpen(false)}
         title="우리 동네 배출 안내"
-        subtitle={`${regionFull || '우리 동네'}의 재활용품 배출 정보를 확인해보세요`}
+        subtitle={`${region || '우리 동네'}의 재활용품 배출 정보를 확인해보세요`}
         minHeight={437}
         divider>
         {rules.map((group, index) => (

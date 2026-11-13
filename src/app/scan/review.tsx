@@ -45,7 +45,7 @@ export default function ScanReviewScreen() {
   const [categories, setCategories] = useState<TrashCategory[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   // 사용자가 정한 지역. 결과 화면에 "우리 동네 기준 배출 일정"을 붙인다. 못 불러와도 화면은 그대로 동작한다.
-  const [region, setRegion] = useState<{ short: string; full: string }>({ short: '', full: '' });
+  const [region, setRegion] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -67,8 +67,8 @@ export default function ScanReviewScreen() {
     getProfile()
       .then((profile) => {
         if (cancelled || !profile.region) return;
-        const { sido, gugun, dong } = profile.region;
-        setRegion({ short: `${gugun} ${dong}`, full: `${sido} ${gugun} ${dong}` });
+        const { gugun, dong } = profile.region;
+        setRegion(`${gugun} ${dong}`);
       })
       .catch(() => undefined);
     return () => {
@@ -263,8 +263,7 @@ export default function ScanReviewScreen() {
       <ReviewResult
         groups={groups}
         itemCount={items.length}
-        region={region.short}
-        regionFull={region.full}
+        region={region}
         acceptedItems={categories.filter((category) => !isGeneralWasteCode(category.code)).map((category) => categoryDisplayName(category.code, category.name))}
         isSaving={isSaving}
         error={actionError}
