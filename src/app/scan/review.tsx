@@ -229,6 +229,13 @@ export default function ScanReviewScreen() {
     }
   };
 
+  // 새로고침이나 앱 전환 뒤에 이 화면이 처음부터 열리면 돌아갈 이전 화면이 없어서 router.back()이 아무 일도 하지 않는다.
+  // 그때는 카메라로 보낸다.
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/scan/camera');
+  };
+
   const handleLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setLayout((current) => (current.width === width && current.height === height ? current : { width, height }));
@@ -260,7 +267,7 @@ export default function ScanReviewScreen() {
       {error ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={goBack}>
             <Text style={styles.backText}>카메라로 돌아가기</Text>
           </Pressable>
         </View>
@@ -279,7 +286,7 @@ export default function ScanReviewScreen() {
           </View>
 
           <View style={[styles.header, { top: headerTop }]}>
-            <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" hitSlop={12} onPress={() => router.back()} style={styles.back}>
+            <Pressable accessibilityRole="button" accessibilityLabel="뒤로 가기" hitSlop={12} onPress={goBack} style={styles.back}>
               <PathIcon icon={ICONS.back} color="#FBFBFB" />
             </Pressable>
             <SsokLogo width={51} color="#FBFBFB" />
