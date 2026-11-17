@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { OverlayModal } from '@/components/ui/OverlayModal';
@@ -10,7 +10,7 @@ import { SsokLogo } from '@/components/ui/SsokLogo';
 import { getSeparationDescription } from '@/constants/separation';
 import { Colors } from '@/constants/theme';
 import { categoryDisplayName } from '@/constants/scanDesign';
-import { getScanHistory } from '@/services/api';
+import { getScanHistory, type ScanHistoryEntry } from '@/services/api';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const YEARS = Array.from({ length: 21 }, (_, index) => 2020 + index);
@@ -103,6 +103,36 @@ type HistoryViewEntry = {
   isCompleted: boolean;
 };
 
+// 서버의 스캔 기록을 화면에 보여줄 기록 한 줄씩으로 바꾼다. 월별 달력과 검색이 같이 쓴다.
+function toViewEntries(scans: ScanHistoryEntry[]): HistoryViewEntry[] {
+  return scans.flatMap((scan) => {
+    const scanned = new Date(scan.scannedAt);
+    if (Number.isNaN(scanned.getTime())) return [];
+    const date = toDateKey(scanned.getFullYear(), scanned.getMonth(), scanned.getDate());
+    const time = `${String(scanned.getHours()).padStart(2, '0')}:${String(scanned.getMinutes()).padStart(2, '0')}`;
+    // 한 번 찍은 사진에 물건이 여러 개면 물건마다 기록 한 줄로 보여준다.
+    return scan.items.map((item): HistoryViewEntry => {
+      const name = categoryDisplayName(item.category?.code, item.category?.name) || '일반쓰레기';
+      return {
+        id: `${scan.scanResultId}-${item.objectId}`,
+        date,
+        time,
+        itemLabel: name,
+        // 새 흐름에서는 "배출 방법 확인하기"를 누르면 모든 물건이 확정돼서 거의 항상 확인된 상태다.
+        // 정상 상태를 매번 "확인 완료"로 적을 필요는 없고, 확인하지 않고 나간 예외만 표시한다.
+        method: item.isConfirmed ? `${name} 스캔` : `${name} 스캔 · 확인 전`,
+        isCompleted: true,
+      };
+    });
+  });
+}
+
+// "2026-11-17" → "11.17 화요일"
+function dateLabel(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return `${month}.${day} ${WEEKDAYS[new Date(year, month - 1, day).getDay()]}요일`;
+}
+
 function historyIconForItem(itemLabel: string): keyof typeof Ionicons.glyphMap {
   const label = itemLabel.replace(/\s/g, '');
   if (label.includes('페트')) return 'water-outline';
@@ -168,6 +198,60 @@ export default function HistoryScreen() {
     });
   }, []);
 
+  // 검색: 월별 달력과 달리 모든 달의 기록에서 찾아야 해서, 검색을 열 때 전체 기록을 한 번 받아 둔다.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [allEntries, setAllEntries] = useState<HistoryViewEntry[] | null>(null);
+  const [searchError, setSearchError] = useState(false);
+
+  useEffect(() => {
+    // 오늘 날짜가 아직 자리표시(2000년)일 때는 받지 않는다.
+    if (!searchOpen || today.getFullYear() < 2020) return;
+    let cancelled = false;
+    setSearchError(false);
+    getScanHistory('2000-01-01', todayKey)
+      .then((scans) => {
+        if (!cancelled) setAllEntries(toViewEntries(scans));
+      })
+      .catch((error) => {
+        console.warn('검색할 스캔 기록을 불러오지 못했습니다.', error);
+        if (!cancelled) setSearchError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchOpen, todayKey, today]);
+
+  // 품목 이름에서 띄어쓰기와 대소문자를 무시하고 찾고, 최근 기록이 위로 오게 날짜별로 묶는다.
+  const searchGroups = useMemo(() => {
+    if (!allEntries) return [];
+    const needle = query.replace(/\s/g, '').toLowerCase();
+    const matched = allEntries
+      .filter((entry) => !needle || entry.itemLabel.replace(/\s/g, '').toLowerCase().includes(needle))
+      .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
+    const groups: { date: string; entries: HistoryViewEntry[] }[] = [];
+    for (const entry of matched) {
+      const last = groups[groups.length - 1];
+      if (last?.date === entry.date) last.entries.push(entry);
+      else groups.push({ date: entry.date, entries: [entry] });
+    }
+    return groups;
+  }, [allEntries, query]);
+
+  const toggleSearch = () => {
+    setSearchOpen((open) => !open);
+    setQuery('');
+  };
+
+  // 검색 결과를 누르면 그 날짜의 달력으로 이동한다.
+  const jumpToEntryDate = (date: string) => {
+    const [year, month] = date.split('-').map(Number);
+    setCursor({ year, month: month - 1 });
+    setSelected(date);
+    setSearchOpen(false);
+    setQuery('');
+  };
+
   // 스캔 결과를 저장하고 이 탭으로 돌아올 때마다 최신 기록을 다시 불러온다.
   useFocusEffect(useCallback(() => {
     let cancelled = false;
@@ -180,24 +264,7 @@ export default function HistoryScreen() {
         if (cancelled) return;
         setLoadError(false);
         setHistoryEntries(
-          scans.flatMap((scan) => {
-            const scanned = new Date(scan.scannedAt);
-            if (Number.isNaN(scanned.getTime())) return [];
-            const date = toDateKey(scanned.getFullYear(), scanned.getMonth(), scanned.getDate());
-            const time = `${String(scanned.getHours()).padStart(2, '0')}:${String(scanned.getMinutes()).padStart(2, '0')}`;
-            // 한 번 찍은 사진에 물건이 여러 개면 물건마다 기록 한 줄로 보여준다.
-            return scan.items.map((item): HistoryViewEntry => {
-              const name = categoryDisplayName(item.category?.code, item.category?.name) || '일반쓰레기';
-              return {
-                id: `${scan.scanResultId}-${item.objectId}`,
-                date,
-                time,
-                itemLabel: name,
-                method: `${name} 스캔 · ${item.isConfirmed ? '확인 완료' : '확인 전'}`,
-                isCompleted: true,
-              };
-            });
-          })
+          toViewEntries(scans)
         );
       })
       .catch((error) => {
@@ -229,12 +296,7 @@ export default function HistoryScreen() {
   }, [cursor]);
 
   const selectedEntries = selected ? entriesByDate[selected] ?? [] : [];
-  const selectedLabel = selected
-    ? (() => {
-        const [selectedYear, selectedMonth, selectedDay] = selected.split('-').map(Number);
-        return `${selectedMonth}.${selectedDay} ${WEEKDAYS[new Date(selectedYear, selectedMonth - 1, selectedDay).getDay()]}요일`;
-      })()
-    : '';
+  const selectedLabel = selected ? dateLabel(selected) : '';
 
   const openDatePicker = () => {
     const base = selected ? new Date(`${selected}T00:00:00`) : new Date(cursor.year, cursor.month, today.getDate());
@@ -285,17 +347,68 @@ export default function HistoryScreen() {
           <Pressable style={styles.headerToolButton} onPress={() => setSelected((value) => value ? null : todayKey)}>
             <Ionicons name="list" size={22} color={selected ? Colors.primary : '#222222'} />
           </Pressable>
-          <Ionicons name="search" size={22} color="#222222" />
+          <Pressable accessibilityRole="button" accessibilityLabel="기록 검색" style={styles.headerToolButton} onPress={toggleSearch}>
+            <Ionicons name="search" size={22} color={searchOpen ? Colors.primary : '#222222'} />
+          </Pressable>
           <Pressable onPress={() => { setItemType(null); setTypeError(false); setOpenDropdown(null); setItemPickerVisible(true); }}>
             <Ionicons name="add" size={25} color="#222222" />
           </Pressable>
         </View>
       </View>
 
+      {searchOpen && (
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={18} color="#6B7280" />
+          <TextInput
+            autoFocus
+            value={query}
+            onChangeText={setQuery}
+            placeholder="품목 이름으로 검색해 보세요 (예: 플라스틱)"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="search"
+            style={styles.searchInput}
+          />
+          {!!query && (
+            <Pressable accessibilityRole="button" accessibilityLabel="검색어 지우기" hitSlop={8} onPress={() => setQuery('')}>
+              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <ScrollView
         style={styles.screenScroll}
         contentContainerStyle={styles.screenContent}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
+      {searchOpen ? (
+        <View style={styles.searchResults}>
+          {searchError ? (
+            <Text style={styles.emptyText}>기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.</Text>
+          ) : !allEntries ? (
+            <Text style={styles.emptyText}>기록을 찾는 중이에요…</Text>
+          ) : searchGroups.length === 0 ? (
+            <Text style={styles.emptyText}>{query ? `'${query.trim()}'에 해당하는 기록이 없어요.` : '아직 스캔 기록이 없어요.'}</Text>
+          ) : (
+            searchGroups.map((group) => (
+              <View key={group.date} style={styles.searchGroup}>
+                <Text style={styles.searchDate}>{`${group.date.slice(0, 4)}. ${dateLabel(group.date)}`}</Text>
+                <View style={styles.entryList}>
+                  {group.entries.map((entry) => (
+                    <Pressable key={entry.id} accessibilityRole="button" onPress={() => jumpToEntryDate(entry.date)} style={styles.entryRow}>
+                      <Ionicons name={historyIconForItem(entry.itemLabel)} size={25} color="#222222" />
+                      <Text style={styles.entryTime}>{entry.time}</Text>
+                      <View style={styles.entryAccent} />
+                      <Text numberOfLines={1} style={styles.entryMethod}>{entry.method}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      ) : (
+      <>
       <Pressable style={styles.monthRow} onPress={openDatePicker}>
         <Text style={styles.monthText}>{cursor.year}. {String(cursor.month + 1).padStart(2, '0')}</Text>
         <Ionicons name={pickerVisible ? 'caret-up' : 'caret-down'} size={12} color="#222222" />
@@ -361,6 +474,8 @@ export default function HistoryScreen() {
             )}
           </View>
         </>
+      )}
+      </>
       )}
       </ScrollView>
 
@@ -564,6 +679,21 @@ const styles = StyleSheet.create({
   sectionDivider: { height: 7, backgroundColor: '#F5F5F5', borderTopWidth: 1, borderTopColor: '#EEEEEE' },
   historyHeader: { height: 54, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   historyDate: { fontSize: 17, lineHeight: 22, fontWeight: '800', color: '#222222' },
+  searchBar: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchInput: { flex: 1, height: 44, fontSize: 15, color: '#111827', outlineStyle: 'none' } as object,
+  searchResults: { paddingTop: 8 },
+  searchGroup: { paddingTop: 12 },
+  searchDate: { paddingHorizontal: 16, paddingBottom: 10, fontSize: 15, lineHeight: 20, fontWeight: '800', color: '#222222' },
   entryList: { paddingHorizontal: 16, paddingBottom: 18, gap: 12 },
   entryRow: { height: 48, paddingHorizontal: 14, borderRadius: 4, backgroundColor: '#F1F1F1', flexDirection: 'row', alignItems: 'center' },
   entryTime: { marginLeft: 8, fontSize: 15, color: '#222222', fontWeight: '600' },
