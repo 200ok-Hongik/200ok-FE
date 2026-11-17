@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/components/ui/Button';
 import { Text } from '@/components/ui/Text';
 import { checkItemStepTitle } from '@/constants/guideSteps';
 import { getTrashCategoryGuide, type TrashCategoryGuide } from '@/services/api';
@@ -110,10 +109,6 @@ export default function GuideDetailScreen() {
           )}
         </ScrollView>
       )}
-
-      <View style={styles.footer}>
-        <Button label="정보 저장하기" onPress={() => router.back()} style={styles.saveButton} />
-      </View>
     </SafeAreaView>
   );
 }
@@ -146,6 +141,4 @@ const styles = StyleSheet.create({
   errorText: { color: '#6D727A', fontSize: 14 },
   retryButton: { height: 38, paddingHorizontal: 20, borderRadius: 19, borderWidth: 1, borderColor: '#1EA866', alignItems: 'center', justifyContent: 'center' },
   retryText: { fontSize: 13, fontWeight: '700', color: '#1EA866' },
-  footer: { paddingHorizontal: 18, paddingTop: 10, paddingBottom: 8, backgroundColor: '#FFFFFF' },
-  saveButton: { height: 52, borderRadius: 8 },
 });
