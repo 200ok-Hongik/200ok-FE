@@ -32,13 +32,21 @@ export async function getScheduleItemInfos(today: Date): Promise<Record<number, 
     getScanHistory(dateKey(from), dateKey(today)),
   ]);
 
-  const sources = new Map<number, { scanId: number; imageUrl: string; scannedAt: string; objectId: string }>();
+  const sources = new Map<number, { scanId: number; imageUrl: string; scannedAt: string; objectId: string; categoryId?: number }>();
+  // 같은 판단 번호가 여러 물건에 붙어 있으면 어느 물건인지 알 수 없다.
+  const ambiguous = new Set<number>();
   for (const scan of scans) {
     if (!scan.imageUrl) continue;
     for (const item of scan.items) {
-      if (item.decisionId != null) {
-        sources.set(item.decisionId, { scanId: scan.scanResultId, imageUrl: scan.imageUrl, scannedAt: scan.scannedAt, objectId: item.objectId });
-      }
+      if (item.decisionId == null) continue;
+      if (sources.has(item.decisionId)) ambiguous.add(item.decisionId);
+      sources.set(item.decisionId, {
+        scanId: scan.scanResultId,
+        imageUrl: scan.imageUrl,
+        scannedAt: scan.scannedAt,
+        objectId: item.objectId,
+        categoryId: item.category?.categoryId,
+      });
     }
   }
 
@@ -49,12 +57,21 @@ export async function getScheduleItemInfos(today: Date): Promise<Record<number, 
     calendars.map(async (calendar) => {
       const info: ScheduleItemInfo = { categoryId: calendar.categoryId, decisionId: calendar.disposalDecisionId };
       const source = sources.get(calendar.disposalDecisionId);
-      if (source) {
+      // 박스는 틀린 곳을 가리키느니 안 보이는 게 낫다. 짝이 확실하지 않으면 사진도 박스도 보여주지 않는다.
+      // (판단 번호가 겹치면 사진부터 못 믿는다. 품목이 서로 다르면 같은 스캔이라도 다른 물건과 짝지었을 수 있어 박스만 뺀다.)
+      if (source && !ambiguous.has(calendar.disposalDecisionId)) {
+        const sameCategory = source.categoryId == null || source.categoryId === calendar.categoryId;
         if (!objectsByScan.has(source.scanId)) {
           objectsByScan.set(source.scanId, getScanObjects(source.scanId).then((list) => list.objects).catch(() => []));
         }
         const objects = await objectsByScan.get(source.scanId)!;
-        info.scan = { ...source, bbox: objects.find((object) => object.objectId === source.objectId)?.bbox };
+        info.scan = {
+          scanId: source.scanId,
+          objectId: source.objectId,
+          imageUrl: source.imageUrl,
+          scannedAt: source.scannedAt,
+          bbox: sameCategory ? objects.find((object) => object.objectId === source.objectId)?.bbox : undefined,
+        };
       }
       infos[calendar.calendarId] = info;
     })
