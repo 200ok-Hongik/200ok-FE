@@ -5,6 +5,7 @@ import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { PushForegroundBanner } from '@/components/home/PushForegroundBanner';
 import { WEB_FRAME_ID } from '@/components/ui/OverlayModal';
 
 const isWeb = Platform.OS === 'web';
@@ -47,6 +48,7 @@ export default function RootLayout() {
           <View style={[styles.webBackdrop, isMobileWeb && styles.mobileWebBackdrop]}>
             <View style={[styles.webFrame, isMobileWeb && styles.mobileWebFrame]} nativeID={WEB_FRAME_ID}>
               {stack}
+              <PushForegroundBanner />
             </View>
           </View>
         ) : (

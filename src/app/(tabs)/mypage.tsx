@@ -14,6 +14,7 @@ import {
   type FrequentScanCategory,
   type UserProfile,
 } from '@/services/api';
+import { disablePush } from '@/services/webPush';
 
 
 export default function MyPageScreen() {
@@ -78,7 +79,7 @@ export default function MyPageScreen() {
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-    try { await logout(); } catch (error) { console.warn('로그아웃 API 호출에 실패했습니다.', error); }
+    try { await disablePush(); await logout(); } catch (error) { console.warn('로그아웃 API 호출에 실패했습니다.', error); }
     finally {
       if (Platform.OS === 'web') window.location.replace('/');
       else { router.dismissAll(); router.replace('/'); }

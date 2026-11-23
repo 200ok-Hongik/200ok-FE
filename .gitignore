@@ -42,3 +42,6 @@ example
 /ios
 /android
 .vercel
+
+# 설치할 때 node_modules/firebase에서 복사되는 파일 (scripts/copy-firebase-sw.js)
+public/firebase-sdk/

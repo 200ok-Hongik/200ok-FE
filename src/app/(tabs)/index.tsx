@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { SsokLogo } from '@/components/ui/SsokLogo';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,12 +13,15 @@ import { Card } from '@/components/ui/Card';
 import { Colors, FontSize, Radius, Spacing } from '@/constants/theme';
 import { ScheduleDetailSheet } from '@/components/home/ScheduleDetailSheet';
 import { WelcomeModal } from '@/components/home/WelcomeModal';
+import { PushPrompt } from '@/components/home/PushPrompt';
+import { PUSH_MESSAGE_EVENT } from '@/components/home/PushForegroundBanner';
 import { ScanSheet } from '@/components/scan/ScanSheet';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { CATEGORY_ICONS } from '@/constants/categoryIcons';
 import { categoryDisplayName } from '@/constants/scanDesign';
 import { ObjectThumb } from '@/components/scan/ObjectThumb';
 import { getScheduleItemInfos, type ScheduleItemInfo } from '@/services/scheduleItems';
+import { syncPushToken } from '@/services/webPush';
 import { getLastSeenNotificationId, setLastSeenNotificationId } from '@/services/notificationSeen';
 import {
   completeCalendar,
@@ -70,6 +73,19 @@ export default function HomeScreen() {
   useEffect(() => {
     setToday(new Date());
     setLastSeenId(getLastSeenNotificationId());
+  }, []);
+
+  // 이미 알림을 허용한 기기는 홈에 들어올 때 푸시 토큰을 조용히 확인·갱신한다. (권한을 새로 묻지 않는다)
+  useEffect(() => {
+    syncPushToken();
+  }, []);
+
+  // 푸시가 도착하면 최근 알림 목록을 다시 불러와 종에 새 알림 표시가 뜨게 한다.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const reload = () => getHomeSummary().then(setHomeSummary).catch(() => {});
+    window.addEventListener(PUSH_MESSAGE_EVENT, reload);
+    return () => window.removeEventListener(PUSH_MESSAGE_EVENT, reload);
   }, []);
 
   // 마지막으로 확인한 번호보다 큰 알림이 있을 때만 종에 빨간 점을 띄운다.
@@ -359,6 +375,7 @@ export default function HomeScreen() {
         title="알림"
         subtitle="최근 알림 10건을 보여드려요."
         minHeight={300}>
+        <PushPrompt />
         <View style={styles.notificationList}>
           {notifications.length === 0 ? (
             <Text style={styles.notificationEmpty}>받은 알림이 없어요.</Text>

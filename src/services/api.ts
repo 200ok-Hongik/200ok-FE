@@ -801,6 +801,23 @@ export async function refreshSession(): Promise<void> {
   await request<void>('/api/auth/refresh', { method: 'POST' }, false);
 }
 
+// 푸시 알림(FCM)을 받을 기기 등록·해제. 로그인 쿠키로 인증하므로 userId는 보내지 않는다.
+export async function registerNotificationDevice(token: string): Promise<void> {
+  await request<void>('/api/notifications/devices', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, deviceType: 'WEB' }),
+  });
+}
+
+export async function unregisterNotificationDevice(token: string): Promise<void> {
+  await request<void>('/api/notifications/devices', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+}
+
 export async function logout(): Promise<void> {
   await request<void>('/api/auth/logout', { method: 'POST' }, false);
 }
