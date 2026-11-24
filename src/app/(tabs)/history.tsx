@@ -11,6 +11,7 @@ import { getSeparationDescription } from '@/constants/separation';
 import { Colors } from '@/constants/theme';
 import { categoryDisplayName } from '@/constants/scanDesign';
 import { getScanHistory, type ScanHistoryEntry } from '@/services/api';
+import { addManualHistory, loadManualHistory } from '@/services/manualHistory';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 const YEARS = Array.from({ length: 21 }, (_, index) => 2020 + index);
@@ -183,7 +184,13 @@ export default function HistoryScreen() {
   const [isClean, setIsClean] = useState(true);
   const [separationStatus, setSeparationStatus] = useState<'완료' | '안 함' | '해당 없음'>('해당 없음');
   const [historyEntries, setHistoryEntries] = useState<HistoryViewEntry[]>([]);
+  // "+"로 직접 추가한 기록. 서버 기록을 다시 받아도 사라지지 않게 따로 들고 있는다.
+  const [manualEntries, setManualEntries] = useState<HistoryViewEntry[]>([]);
   const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    setManualEntries(loadManualHistory());
+  }, []);
 
   useEffect(() => {
     const localToday = new Date();
@@ -226,7 +233,7 @@ export default function HistoryScreen() {
   const searchGroups = useMemo(() => {
     if (!allEntries) return [];
     const needle = query.replace(/\s/g, '').toLowerCase();
-    const matched = allEntries
+    const matched = [...allEntries, ...manualEntries]
       .filter((entry) => !needle || entry.itemLabel.replace(/\s/g, '').toLowerCase().includes(needle))
       .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`));
     const groups: { date: string; entries: HistoryViewEntry[] }[] = [];
@@ -236,7 +243,7 @@ export default function HistoryScreen() {
       else groups.push({ date: entry.date, entries: [entry] });
     }
     return groups;
-  }, [allEntries, query]);
+  }, [allEntries, manualEntries, query]);
 
   const toggleSearch = () => {
     setSearchOpen((open) => !open);
@@ -280,11 +287,11 @@ export default function HistoryScreen() {
 
   const entriesByDate = useMemo(() => {
     const map: Record<string, HistoryViewEntry[]> = {};
-    historyEntries.forEach((entry) => {
+    [...historyEntries, ...manualEntries].forEach((entry) => {
       map[entry.date] = [...(map[entry.date] ?? []), entry];
     });
     return map;
-  }, [historyEntries]);
+  }, [historyEntries, manualEntries]);
 
   const cells = useMemo(() => {
     const firstDay = new Date(cursor.year, cursor.month, 1).getDay();
@@ -320,17 +327,16 @@ export default function HistoryScreen() {
     }
     const date = selected ?? todayKey;
     const now = new Date();
-    setHistoryEntries((entries) => [
-      ...entries,
-      {
+    setManualEntries(
+      addManualHistory({
         id: `local-${Date.now()}`,
         date,
         time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
         itemLabel: itemType,
         method: `${itemType} · 구성품 분리 ${separationStatus}`,
         isCompleted: true,
-      },
-    ]);
+      })
+    );
     setSelected(date);
     setOpenDropdown(null);
     setItemPickerVisible(false);
