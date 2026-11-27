@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -32,6 +33,15 @@ function scheduleText(group: Pick<ReviewGroup, 'days' | 'time'>) {
 export function ReviewResult({ groups, itemCount, region, acceptedItems, isSaving, error, onBack, onSave }: Props) {
   const insets = useSafeAreaInsets();
   const [rulesOpen, setRulesOpen] = useState(false);
+  // 묶음이 여러 개면 한 번에 하나씩 < > 로 넘겨 본다. (저장은 모든 묶음이 한꺼번에 된다)
+  const [page, setPage] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const pageCount = groups.length;
+  const current = Math.min(page, Math.max(pageCount - 1, 0));
+  const goToPage = (next: number) => {
+    setPage(Math.min(Math.max(next, 0), pageCount - 1));
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  };
 
   // 지역 규칙 시트에는 품목마다 한 줄씩만 보여준다. (같은 품목이 상태 때문에 여러 묶음이어도 일정은 같다)
   const rules = groups.filter((group, index) => groups.findIndex((other) => other.categoryName === group.categoryName) === index);
@@ -45,7 +55,7 @@ export function ReviewResult({ groups, itemCount, region, acceptedItems, isSavin
         <SsokLogo width={51} color={ScanColors.green} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: Math.max(insets.bottom, 16) + 120 }]}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: Math.max(insets.bottom, 16) + 120 }]}>
         <Text style={styles.title}>{`${groups.length}가지로 나눠서 버려요`}</Text>
         <Text style={styles.subtitle}>{`물건 ${itemCount}개 · 번호는 사진 속 번호예요`}</Text>
 
@@ -57,7 +67,38 @@ export function ReviewResult({ groups, itemCount, region, acceptedItems, isSavin
           </Pressable>
         </View>
 
-        {groups.map((group) => (
+        {pageCount > 1 && (
+          <View style={styles.pager}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="이전 품목"
+              disabled={current === 0}
+              hitSlop={10}
+              onPress={() => goToPage(current - 1)}
+              style={[styles.pagerButton, current === 0 && styles.pagerButtonOff]}>
+              <Ionicons name="chevron-back" size={20} color={current === 0 ? ScanColors.grayLight : ScanColors.ink} />
+            </Pressable>
+            <View style={styles.pagerCenter}>
+              <Text style={styles.pagerText}>{`${current + 1} / ${pageCount}`}</Text>
+              <View style={styles.dots}>
+                {groups.map((group, index) => (
+                  <View key={group.key} style={[styles.dot, index === current && styles.dotOn]} />
+                ))}
+              </View>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="다음 품목"
+              disabled={current === pageCount - 1}
+              hitSlop={10}
+              onPress={() => goToPage(current + 1)}
+              style={[styles.pagerButton, current === pageCount - 1 && styles.pagerButtonOff]}>
+              <Ionicons name="chevron-forward" size={20} color={current === pageCount - 1 ? ScanColors.grayLight : ScanColors.ink} />
+            </Pressable>
+          </View>
+        )}
+
+        {groups.filter((_, index) => index === current).map((group) => (
           <View key={group.key} style={styles.card}>
             <View style={styles.cardHead}>
               <Text style={styles.cardTitle}>{group.categoryName}</Text>
@@ -180,6 +221,15 @@ const styles = StyleSheet.create({
   regionRow: { marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
   regionText: { flex: 1, fontSize: 14, lineHeight: 20, fontWeight: '600', color: ScanColors.ink },
   regionLink: { fontSize: 13, fontWeight: '600', color: ScanColors.greenText },
+
+  pager: { marginTop: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pagerButton: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: ScanColors.border, alignItems: 'center', justifyContent: 'center' },
+  pagerButtonOff: { opacity: 0.45 },
+  pagerCenter: { alignItems: 'center', gap: 6 },
+  pagerText: { fontSize: 14, fontWeight: '700', color: ScanColors.ink },
+  dots: { flexDirection: 'row', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: ScanColors.line },
+  dotOn: { backgroundColor: ScanColors.green },
 
   card: {
     marginTop: 16,
