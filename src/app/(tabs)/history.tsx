@@ -164,12 +164,12 @@ function TrashDay({ count }: { count: number }) {
   );
 }
 
-const COLLAPSED_COUNT = 4;
+const COLLAPSED_COUNT = 3;
 
-// 하루에 기록이 많을 때 앞 4개만 보여 주고 "더 보기"로 펼친다. 날짜가 바뀌면 key가 달라져 다시 접힌다.
+// 하루에 기록이 많을 때 앞 3개만 보여 주고 "더 보기"로 펼친다. 날짜가 바뀌면 key가 달라져 다시 접힌다.
 function EntryList({ entries, onPressEntry }: { entries: HistoryViewEntry[]; onPressEntry?: (entry: HistoryViewEntry) => void }) {
   const [expanded, setExpanded] = useState(false);
-  const canCollapse = entries.length > COLLAPSED_COUNT + 1;
+  const canCollapse = entries.length > COLLAPSED_COUNT;
   const visible = canCollapse && !expanded ? entries.slice(0, COLLAPSED_COUNT) : entries;
   const hiddenCount = entries.length - COLLAPSED_COUNT;
 
