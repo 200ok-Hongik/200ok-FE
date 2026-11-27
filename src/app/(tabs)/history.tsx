@@ -164,6 +164,48 @@ function TrashDay({ count }: { count: number }) {
   );
 }
 
+const COLLAPSED_COUNT = 4;
+
+// 하루에 기록이 많을 때 앞 4개만 보여 주고 "더 보기"로 펼친다. 날짜가 바뀌면 key가 달라져 다시 접힌다.
+function EntryList({ entries, onPressEntry }: { entries: HistoryViewEntry[]; onPressEntry?: (entry: HistoryViewEntry) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const canCollapse = entries.length > COLLAPSED_COUNT + 1;
+  const visible = canCollapse && !expanded ? entries.slice(0, COLLAPSED_COUNT) : entries;
+  const hiddenCount = entries.length - COLLAPSED_COUNT;
+
+  return (
+    <View style={styles.entryList}>
+      {visible.map((entry) => {
+        const content = (
+          <>
+            <Ionicons name={historyIconForItem(entry.itemLabel)} size={25} color="#222222" />
+            <Text style={styles.entryTime}>{entry.time}</Text>
+            <View style={styles.entryAccent} />
+            <Text numberOfLines={1} style={styles.entryMethod}>{entry.method}</Text>
+          </>
+        );
+        return onPressEntry ? (
+          <Pressable key={entry.id} accessibilityRole="button" onPress={() => onPressEntry(entry)} style={styles.entryRow}>
+            {content}
+          </Pressable>
+        ) : (
+          <View key={entry.id} style={styles.entryRow}>{content}</View>
+        );
+      })}
+      {canCollapse && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={expanded ? '기록 접기' : `기록 ${hiddenCount}개 더 보기`}
+          onPress={() => setExpanded((value) => !value)}
+          style={styles.moreButton}>
+          <Text style={styles.moreText}>{expanded ? '접기' : `${hiddenCount}개 더 보기`}</Text>
+          <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="#666666" />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 export default function HistoryScreen() {
   // Keep the server render and the browser's first render identical. The real
   // local date is applied after hydration below.
@@ -399,16 +441,7 @@ export default function HistoryScreen() {
             searchGroups.map((group) => (
               <View key={group.date} style={styles.searchGroup}>
                 <Text style={styles.searchDate}>{`${group.date.slice(0, 4)}. ${dateLabel(group.date)}`}</Text>
-                <View style={styles.entryList}>
-                  {group.entries.map((entry) => (
-                    <Pressable key={entry.id} accessibilityRole="button" onPress={() => jumpToEntryDate(entry.date)} style={styles.entryRow}>
-                      <Ionicons name={historyIconForItem(entry.itemLabel)} size={25} color="#222222" />
-                      <Text style={styles.entryTime}>{entry.time}</Text>
-                      <View style={styles.entryAccent} />
-                      <Text numberOfLines={1} style={styles.entryMethod}>{entry.method}</Text>
-                    </Pressable>
-                  ))}
-                </View>
+                <EntryList entries={group.entries} onPressEntry={(entry) => jumpToEntryDate(entry.date)} />
               </View>
             ))
           )}
@@ -465,20 +498,13 @@ export default function HistoryScreen() {
             <Text style={styles.historyDate}>{selectedLabel}</Text>
             <Ionicons name="ellipsis-vertical" size={22} color="#555555" />
           </View>
-          <View style={styles.entryList}>
-            {selectedEntries.length === 0 ? (
+          {selectedEntries.length === 0 ? (
+            <View style={styles.entryList}>
               <Text style={styles.emptyText}>{loadError ? '기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.' : '이날은 분리배출 기록이 없어요.'}</Text>
-            ) : (
-              selectedEntries.map((entry) => (
-                <View key={entry.id} style={styles.entryRow}>
-                  <Ionicons name={historyIconForItem(entry.itemLabel)} size={25} color="#222222" />
-                  <Text style={styles.entryTime}>{entry.time}</Text>
-                  <View style={styles.entryAccent} />
-                  <Text numberOfLines={1} style={styles.entryMethod}>{entry.method}</Text>
-                </View>
-              ))
-            )}
-          </View>
+            </View>
+          ) : (
+            <EntryList key={selected} entries={selectedEntries} />
+          )}
         </>
       )}
       </>
@@ -704,6 +730,8 @@ const styles = StyleSheet.create({
   entryRow: { height: 48, paddingHorizontal: 14, borderRadius: 4, backgroundColor: '#F1F1F1', flexDirection: 'row', alignItems: 'center' },
   entryTime: { marginLeft: 8, fontSize: 15, color: '#222222', fontWeight: '600' },
   entryAccent: { width: 2, height: 30, marginHorizontal: 10, backgroundColor: '#FF8A00' },
+  moreButton: { height: 40, borderRadius: 4, borderWidth: 1, borderColor: '#E0E0E0', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  moreText: { fontSize: 13, color: '#666666', fontWeight: '700' },
   entryMethod: { flex: 1, fontSize: 13, color: '#222222', fontWeight: '600' },
   emptyText: { paddingTop: 12, textAlign: 'center', color: Colors.textTertiary, fontSize: 13 },
   modalBackdrop: {
