@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ICONS } from '@/components/scan/iconPaths';
@@ -42,6 +42,20 @@ export function ReviewResult({ groups, itemCount, region, acceptedItems, isSavin
     setPage(Math.min(Math.max(next, 0), pageCount - 1));
     scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
+  // 좌우로 쓸어 넘기기. 세로 스크롤과 겹치지 않게 가로로 충분히 움직였을 때만 가로채고, 왼쪽으로 쓸면 다음 장이다.
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          pageCount > 1 && Math.abs(gesture.dx) > 14 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+        onPanResponderRelease: (_event, gesture) => {
+          if (Math.abs(gesture.dx) < 50) return;
+          goToPage(current + (gesture.dx < 0 ? 1 : -1));
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [current, pageCount]
+  );
 
   // 지역 규칙 시트에는 품목마다 한 줄씩만 보여준다. (같은 품목이 상태 때문에 여러 묶음이어도 일정은 같다)
   const rules = groups.filter((group, index) => groups.findIndex((other) => other.categoryName === group.categoryName) === index);
@@ -99,7 +113,7 @@ export function ReviewResult({ groups, itemCount, region, acceptedItems, isSavin
         )}
 
         {groups.filter((_, index) => index === current).map((group) => (
-          <View key={group.key} style={styles.card}>
+          <View key={group.key} style={styles.card} {...swipe.panHandlers}>
             <View style={styles.cardHead}>
               <Text style={styles.cardTitle}>{group.categoryName}</Text>
               <Text style={styles.cardCount}>{`${group.items.length}개`}</Text>
@@ -233,6 +247,8 @@ const styles = StyleSheet.create({
 
   card: {
     marginTop: 16,
+    // 세로 스크롤은 브라우저에 맡기고, 가로 쓸기는 위의 스와이프가 받게 한다.
+    touchAction: 'pan-y',
     padding: 20,
     borderRadius: 14,
     borderWidth: 1,
